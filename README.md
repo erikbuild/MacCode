@@ -1,6 +1,6 @@
 # VibeRetro68
 
-A reference guide and project template for building classic Macintosh (System 7, 68K) applications on modern Apple Silicon Macs using the Retro68 cross-compiler toolchain.
+A reference guide and project template for building classic Macintosh (System 6 and 7, 68K) applications on modern Apple Silicon Macs using the Retro68 cross-compiler toolchain.
 
 ## Using This for a New Project
 
@@ -25,71 +25,116 @@ This repo is a template. If you're starting your own project, download a zip ins
 ## What's Here
 
 ```
+src/                    Your project source (C/C++) — create as needed
+resources/              Rez resource definitions (.r files) — create as needed
+Brewfile                Homebrew prerequisites (cmake, boost, flex, …)
+Makefile                Task runner — shortcuts for the scripts/ commands
 docs/
   RETRO68_SETUP.md      Toolchain installation and configuration
   EMULATOR_SETUP.md     Basilisk II and Mini vMac setup
   WORKFLOW.md           Iterative dev workflow with Claude Code
 scripts/
-  build-and-deploy.sh   Build and copy artifact to Basilisk II shared folder
+  setup.sh              One-shot: fetch-deps → build-retro68 → doctor
+  fetch-deps.sh         Download Retro68 source, emulators, ROMs into deps/
+  build-retro68.sh      Build the Retro68 cross-compiler (~30-60 min, one-time)
+  doctor.sh             Diagnose missing or misconfigured pieces of deps/
+  run-basiliskii.sh     Build, copy .bin to Basilisk II shared folder, launch the emulator
+  run-minivmac.sh       Build and (re)launch Mini vMac with the resulting .dsk
+deps/                   Retro68 toolchain + emulators (gitignored — see deps/*/README.md)
 ```
+
+Put your source files under `src/`.
 
 ## Quick Start
 
-### Prerequisites
+### One-shot setup
 
 ```bash
-brew install cmake gmp mpfr libmpc boost bison flex texinfo
+make setup
 ```
 
-### Build Retro68 (one-time, ~30-60 min)
+That runs the four sub-steps in order:
 
-```bash
-git clone --recursive https://github.com/autc04/Retro68.git ~/Code/Retro68
-mkdir ~/Code/Retro68-build && cd ~/Code/Retro68-build
-../Retro68/build-toolchain.bash --no-ppc --clean-after-build
-```
+| Step | What it does |
+|------|--------------|
+| 1. `brew bundle` | Install the Homebrew formulae listed in [Brewfile](Brewfile) (cmake, boost, flex, etc.) |
+| 2. `make fetch-deps` | Clone Retro68, download emulator binaries, ROMs, and the System 7.5.3 disk image into `deps/` |
+| 3. `make build-retro68` | Build the Retro68 toolchain (~30-60 min, one-time) and configure the project's `build/` against it |
+| 4. `make doctor` | Verify every piece is in place; exits non-zero on any failure |
+
+Homebrew itself is required up front — `make setup` errors out with
+install instructions if `brew` isn't on `PATH`.
+
+Every target is idempotent, so `make setup` is safe to re-run after a
+partial install or a `git pull` that adds new deps. You can also invoke
+any sub-target directly if you only need that step.
+
+The `deps/` directory is gitignored — every clone builds its own
+toolchain. See [deps/retro68/README.md](deps/retro68/README.md) for layout.
 
 ### Start a New Project
 
-Create a `CMakeLists.txt`:
+Create a `CMakeLists.txt` at the project root:
 
 ```cmake
 cmake_minimum_required(VERSION 3.9)
 project(MyApp C)
 
 add_application(MyApp
-    SOURCES src/main.c
-    RESOURCES resources/MyApp.r
+    src/main.c
+    resources/MyApp.r
 )
 ```
 
-Configure and build:
+No separate CMake-configure step needed — `make build-retro68`
+configures `build/` against the toolchain on its way out. If you ever
+delete `build/`, just re-run `make build-retro68` and it'll
+reconfigure (the toolchain build itself is already cached).
+
+### Edit → Build → Run
+
+Pick the emulator that fits the moment:
 
 ```bash
-mkdir build && cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=~/Code/Retro68-build/toolchain/m68k-apple-macos/cmake/retro68.toolchain.cmake
-make
+make basiliskii    # System 7.5.3 / Quadra 950 — interactive testing
+make minivmac      # Mac SE FDHD — fast, minimal, drag-disk workflow
 ```
 
-### Test in Basilisk II
+Run `make` with no arguments to see every available target.
 
-Copy the `.bin` output to the Basilisk II shared folder:
+Each target does `cmake --build build/` first, then hands off to the emulator:
 
-```bash
-cp build/MyApp.bin ~/Code/Basilisk\ II/shared/
-```
+- **`make basiliskii`** drops the freshly-built `.bin` into
+  `deps/basiliskii/shared/` and launches Basilisk II if it isn't already
+  running. Basilisk II's shared folder is `extfs`-synced live, so a
+  running emulator picks up the new `.bin` automatically — no restart
+  needed when iterating.
+- **`make minivmac`** kills any running Mini vMac, then relaunches it
+  with the fresh `MyApp.dsk` (or whatever `.dsk` your build produced).
+  The kill-first ordering matters: Mini vMac mmaps the disk image, and
+  overwriting it under a live emulator corrupts the resource fork.
 
-The file appears on the emulated Mac's desktop as a mounted volume.
+To pick a specific app when you have multiple outputs, invoke the
+underlying script directly: `scripts/run-basiliskii.sh MyApp` or
+`scripts/run-minivmac.sh MyApp`.
+
+### Testing on Real Hardware
+
+Mount `build/` over AFP on the classic Mac to easily run the compiled application.
+
+The [TashTalk USB](https://www.tindie.com/products/feralfirmware/tashtalk-usb/) device and [GUI interface](https://github.com/FeralFirmware/TailTalk/releases) are recommended.
 
 ## Toolchain
 
+All toolchain components live under `deps/retro68/` (gitignored — every clone builds its own).
+
 | Component | Location |
 |-----------|----------|
-| Retro68 source | `~/Code/Retro68` |
-| Build output / toolchain | `~/Code/Retro68-build/toolchain/` |
-| CMake toolchain file | `~/Code/Retro68-build/toolchain/m68k-apple-macos/cmake/retro68.toolchain.cmake` |
-| Basilisk II | `~/Code/Basilisk II/` |
-| Mini vMac | `roms/minivmac-macOS-SEFDHD.app` |
+| Retro68 source | `deps/retro68/Retro68/` |
+| Build output / toolchain | `deps/retro68/Retro68-build/toolchain/` |
+| CMake toolchain file | `deps/retro68/Retro68-build/toolchain/m68k-apple-macos/cmake/retro68.toolchain.cmake` |
+| Basilisk II | `deps/basiliskii/` |
+| Mini vMac | `deps/minivmac/minivmac-macOS-SEFDHD.app` |
 
 ## Documentation
 
