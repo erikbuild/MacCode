@@ -141,39 +141,50 @@ Drag the disk image onto the Mini vMac window to "insert" it.
 
 ### AutoQuit for LaunchAPPL Integration
 
-For automated testing, the AutoQuit utility must be installed on the boot
-disk's System Folder. AutoQuit makes Mini vMac exit when the launched
-application calls `ExitToShell()`.
+For automated testing, LaunchAPPL needs an AutoQuit utility to make
+Mini vMac exit when the launched application calls `ExitToShell()`.
+Two variants are downloaded by `make setup`:
 
-AutoQuit is included in the Retro68 source tree:
-```
-deps/retro68/Retro68/LaunchAPPL/MiniVMacLauncher/
-```
+| System version | Utility   | File                    |
+|----------------|-----------|-------------------------|
+| 6.x            | AutoQuit  | `autoquit-1.1.1.dsk`   |
+| 7.x            | AutQuit7  | `autquit7-1.4.1.dsk`   |
+
+LaunchAPPL picks the right one automatically based on the boot disk.
 
 ### LaunchAPPL Configuration
 
-`make setup` generates `~/.LaunchAPPL.cfg` automatically. To create or
-edit it by hand, use this format (flat key = value, parsed by
-boost::program\_options):
+`make setup` generates `~/.LaunchAPPL.cfg` automatically (defaulting to
+System 7.0.1). To create or edit it by hand, use this format (flat
+key = value, parsed by boost::program\_options):
 
 ```
 emulator = minivmac
 minivmac-dir = /path/to/VibeRetro68/deps/minivmac
 minivmac-path = ./minivmac-macOS-SEFDHD.app
 minivmac-rom = ./SEFDHD.ROM
-system-image = ./disk1.dsk
+system-image = ./System7_0_1.img
 autoquit-image = ./autoquit-1.1.1.dsk
+autquit7-image = ./autquit7-1.4.1.dsk
 ```
 
-All paths except `minivmac-dir` are relative to it.
+All paths except `minivmac-dir` are relative to it. To switch system
+versions, change `system-image`:
+
+```
+# System 6.0.8
+system-image = ./disk1.dsk
+
+# System 7.0.1
+system-image = ./System7_0_1.img
+```
 
 Then launch apps from the command line:
 ```bash
 LaunchAPPL -e minivmac build/MyApp.dsk
 ```
 
-Mini vMac will start, boot, run the app, and exit when the app quits
-(via AutoQuit).
+Mini vMac will start, boot, run the app, and exit when the app quits.
 
 ## Which Emulator for What
 

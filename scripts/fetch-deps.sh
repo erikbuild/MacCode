@@ -164,9 +164,28 @@ else
     echo "==> Mini vMac boot disk placed at $MINIVMAC_BOOT_DEST"
 fi
 
-# AutoQuit for LaunchAPPL. When LaunchAPPL boots Mini vMac it needs AutoQuit
-# to make the emulator exit after the launched application calls ExitToShell().
-# disk1.dsk is System 6.0.8, so we use the classic AutoQuit (not AutQuit7).
+# System 7.0.1 HDD image for Mini vMac. LaunchAPPL copies the System file,
+# Finder, and extensions from this image when building its temporary boot
+# disk. 10 MB; larger than a floppy but LaunchAPPL handles that fine.
+SYSTEM701_URL="https://archive.org/download/AppleMacintoshSystem701/System7_0_1.img"
+SYSTEM701_DEST="$MINIVMAC_DIR/System7_0_1.img"
+
+if [ -f "$SYSTEM701_DEST" ]; then
+    echo "==> System 7.0.1 image already present — skipping"
+else
+    TMPIMG="$(mktemp -t sys701).img"
+    echo "==> Downloading System 7.0.1 disk image (~10 MB)"
+    curl --fail --location --progress-bar --output "$TMPIMG" "$SYSTEM701_URL"
+    mv "$TMPIMG" "$SYSTEM701_DEST"
+    echo "==> System 7.0.1 image placed at $SYSTEM701_DEST"
+fi
+
+# AutoQuit utilities for LaunchAPPL. LaunchAPPL needs one of these to make
+# Mini vMac exit after the launched application calls ExitToShell().
+# Which one is used depends on the system-image version:
+#   System 6.x  →  autoquit-image   (AutoQuit)
+#   System 7.x  →  autquit7-image   (AutQuit7)
+# Both are included so switching system-image is a one-line config change.
 AUTOQUIT_URL="https://www.gryphel.com/d/minivmac/extras/autoquit/autoquit-1.1.1.zip"
 AUTOQUIT_DEST="$MINIVMAC_DIR/autoquit-1.1.1.dsk"
 
@@ -178,7 +197,6 @@ else
     curl --fail --location --progress-bar --output "$TMPZIP" "$AUTOQUIT_URL"
     unzip -j -o "$TMPZIP" "*.dsk" -d "$MINIVMAC_DIR" >/dev/null
     rm -f "$TMPZIP"
-    # Rename to a predictable name if the zip contained something different
     shopt -s nullglob
     for f in "$MINIVMAC_DIR"/autoquit*.dsk; do
         if [ "$f" != "$AUTOQUIT_DEST" ]; then
@@ -187,6 +205,27 @@ else
     done
     shopt -u nullglob
     echo "==> AutoQuit placed at $AUTOQUIT_DEST"
+fi
+
+AUTQUIT7_URL="https://www.gryphel.com/d/minivmac/extras/autquit7/autquit7-1.4.1.zip"
+AUTQUIT7_DEST="$MINIVMAC_DIR/autquit7-1.4.1.dsk"
+
+if [ -f "$AUTQUIT7_DEST" ]; then
+    echo "==> AutQuit7 already present — skipping"
+else
+    TMPZIP="$(mktemp -t autquit7).zip"
+    echo "==> Downloading AutQuit7 1.4.1 for LaunchAPPL (~30 KB)"
+    curl --fail --location --progress-bar --output "$TMPZIP" "$AUTQUIT7_URL"
+    unzip -j -o "$TMPZIP" "*.dsk" -d "$MINIVMAC_DIR" >/dev/null
+    rm -f "$TMPZIP"
+    shopt -s nullglob
+    for f in "$MINIVMAC_DIR"/autquit7*.dsk; do
+        if [ "$f" != "$AUTQUIT7_DEST" ]; then
+            mv "$f" "$AUTQUIT7_DEST"
+        fi
+    done
+    shopt -u nullglob
+    echo "==> AutQuit7 placed at $AUTQUIT7_DEST"
 fi
 
 # Homebrew prerequisite check — informational only, we don't install anything
@@ -222,8 +261,14 @@ SEFDHD_ROM_PRESENT=0
 MINIVMAC_PRESENT=0
 [ -d "$MINIVMAC_APP" ] && MINIVMAC_PRESENT=1
 
+SYSTEM701_PRESENT=0
+[ -f "$SYSTEM701_DEST" ] && SYSTEM701_PRESENT=1
+
 AUTOQUIT_PRESENT=0
 [ -f "$AUTOQUIT_DEST" ] && AUTOQUIT_PRESENT=1
+
+AUTQUIT7_PRESENT=0
+[ -f "$AUTQUIT7_DEST" ] && AUTQUIT7_PRESENT=1
 
 # Detect a boot disk image in deps/minivmac/ (any .dsk or .img the user has added)
 BOOTDISK_PRESENT=0
@@ -248,7 +293,9 @@ Current state:
   $(mark $SEFDHD_ROM_PRESENT) deps/minivmac/SEFDHD.ROM                     (downloaded from archive.org)
   $(mark $MINIVMAC_PRESENT) deps/minivmac/minivmac-macOS-SEFDHD.app      (downloaded from GitHub release)
   $(mark $BOOTDISK_PRESENT) deps/minivmac/disk1.dsk                     (System 6.0.8 — downloaded from archive.org)
-  $(mark $AUTOQUIT_PRESENT) deps/minivmac/autoquit-1.1.1.dsk            (AutoQuit — downloaded from gryphel.com)
+  $(mark $SYSTEM701_PRESENT) deps/minivmac/System7_0_1.img               (System 7.0.1 — downloaded from archive.org)
+  $(mark $AUTOQUIT_PRESENT) deps/minivmac/autoquit-1.1.1.dsk            (AutoQuit for System 6 — from gryphel.com)
+  $(mark $AUTQUIT7_PRESENT) deps/minivmac/autquit7-1.4.1.dsk            (AutQuit7 for System 7 — from gryphel.com)
 
 Remaining steps to finish setup
 ================================================================

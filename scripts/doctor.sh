@@ -146,10 +146,24 @@ else
         "LaunchAPPL needs one — see docs/EMULATOR_SETUP.md"
 fi
 
+if [ -f "$DEPS/minivmac/System7_0_1.img" ]; then
+    check_pass "System7_0_1.img present"
+else
+    check_warn "System7_0_1.img missing" \
+        "run scripts/fetch-deps.sh to download it"
+fi
+
 if [ -f "$DEPS/minivmac/autoquit-1.1.1.dsk" ]; then
-    check_pass "autoquit-1.1.1.dsk present (for LaunchAPPL)"
+    check_pass "autoquit-1.1.1.dsk present (for System 6)"
 else
     check_warn "autoquit-1.1.1.dsk missing" \
+        "run scripts/fetch-deps.sh to download it"
+fi
+
+if [ -f "$DEPS/minivmac/autquit7-1.4.1.dsk" ]; then
+    check_pass "autquit7-1.4.1.dsk present (for System 7)"
+else
+    check_warn "autquit7-1.4.1.dsk missing" \
         "run scripts/fetch-deps.sh to download it"
 fi
 
