@@ -164,6 +164,31 @@ else
     echo "==> Mini vMac boot disk placed at $MINIVMAC_BOOT_DEST"
 fi
 
+# AutoQuit for LaunchAPPL. When LaunchAPPL boots Mini vMac it needs AutoQuit
+# to make the emulator exit after the launched application calls ExitToShell().
+# disk1.dsk is System 6.0.8, so we use the classic AutoQuit (not AutQuit7).
+AUTOQUIT_URL="https://www.gryphel.com/d/minivmac/extras/autoquit/autoquit-1.1.1.zip"
+AUTOQUIT_DEST="$MINIVMAC_DIR/autoquit-1.1.1.dsk"
+
+if [ -f "$AUTOQUIT_DEST" ]; then
+    echo "==> AutoQuit already present — skipping"
+else
+    TMPZIP="$(mktemp -t autoquit).zip"
+    echo "==> Downloading AutoQuit 1.1.1 for LaunchAPPL (~27 KB)"
+    curl --fail --location --progress-bar --output "$TMPZIP" "$AUTOQUIT_URL"
+    unzip -j -o "$TMPZIP" "*.dsk" -d "$MINIVMAC_DIR" >/dev/null
+    rm -f "$TMPZIP"
+    # Rename to a predictable name if the zip contained something different
+    shopt -s nullglob
+    for f in "$MINIVMAC_DIR"/autoquit*.dsk; do
+        if [ "$f" != "$AUTOQUIT_DEST" ]; then
+            mv "$f" "$AUTOQUIT_DEST"
+        fi
+    done
+    shopt -u nullglob
+    echo "==> AutoQuit placed at $AUTOQUIT_DEST"
+fi
+
 # Homebrew prerequisite check — informational only, we don't install anything
 REQUIRED_FORMULAE=(cmake gmp mpfr libmpc boost bison flex texinfo)
 MISSING=()
@@ -197,6 +222,9 @@ SEFDHD_ROM_PRESENT=0
 MINIVMAC_PRESENT=0
 [ -d "$MINIVMAC_APP" ] && MINIVMAC_PRESENT=1
 
+AUTOQUIT_PRESENT=0
+[ -f "$AUTOQUIT_DEST" ] && AUTOQUIT_PRESENT=1
+
 # Detect a boot disk image in deps/minivmac/ (any .dsk or .img the user has added)
 BOOTDISK_PRESENT=0
 for f in "$MINIVMAC_DIR"/*.dsk "$MINIVMAC_DIR"/*.img; do
@@ -220,6 +248,7 @@ Current state:
   $(mark $SEFDHD_ROM_PRESENT) deps/minivmac/SEFDHD.ROM                     (downloaded from archive.org)
   $(mark $MINIVMAC_PRESENT) deps/minivmac/minivmac-macOS-SEFDHD.app      (downloaded from GitHub release)
   $(mark $BOOTDISK_PRESENT) deps/minivmac/disk1.dsk                     (System 6.0.8 — downloaded from archive.org)
+  $(mark $AUTOQUIT_PRESENT) deps/minivmac/autoquit-1.1.1.dsk            (AutoQuit — downloaded from gryphel.com)
 
 Remaining steps to finish setup
 ================================================================

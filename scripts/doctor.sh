@@ -146,11 +146,18 @@ else
         "LaunchAPPL needs one — see docs/EMULATOR_SETUP.md"
 fi
 
+if [ -f "$DEPS/minivmac/autoquit-1.1.1.dsk" ]; then
+    check_pass "autoquit-1.1.1.dsk present (for LaunchAPPL)"
+else
+    check_warn "autoquit-1.1.1.dsk missing" \
+        "run scripts/fetch-deps.sh to download it"
+fi
+
 if [ -f "$HOME/.LaunchAPPL.cfg" ]; then
     check_pass "~/.LaunchAPPL.cfg configured"
 else
     check_warn "~/.LaunchAPPL.cfg not found" \
-        "LaunchAPPL won't know which emulator to launch"
+        "see docs/EMULATOR_SETUP.md → LaunchAPPL Configuration"
 fi
 
 # ---- Summary ----

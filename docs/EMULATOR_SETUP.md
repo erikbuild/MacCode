@@ -152,24 +152,28 @@ deps/retro68/Retro68/LaunchAPPL/MiniVMacLauncher/
 
 ### LaunchAPPL Configuration
 
-After building Retro68, configure `~/.LaunchAPPL.cfg`:
+`make setup` generates `~/.LaunchAPPL.cfg` automatically. To create or
+edit it by hand, use this format (flat key = value, parsed by
+boost::program\_options):
 
-```ini
-[LaunchMethod]
-Method=minivmac
-
-[minivmac]
-minivmac=/path/to/VibeRetro68/deps/minivmac/minivmac-macOS-SEFDHD.app/Contents/MacOS/minivmac
-rom=/path/to/VibeRetro68/deps/minivmac/SEFDHD.ROM
-systemImage=/path/to/VibeRetro68/deps/minivmac/disk1.dsk
 ```
+emulator = minivmac
+minivmac-dir = /path/to/VibeRetro68/deps/minivmac
+minivmac-path = ./minivmac-macOS-SEFDHD.app
+minivmac-rom = ./SEFDHD.ROM
+system-image = ./disk1.dsk
+autoquit-image = ./autoquit-1.1.1.dsk
+```
+
+All paths except `minivmac-dir` are relative to it.
 
 Then launch apps from the command line:
 ```bash
 LaunchAPPL -e minivmac build/MyApp.dsk
 ```
 
-Mini vMac will start, boot, run the app, and exit when the app quits.
+Mini vMac will start, boot, run the app, and exit when the app quits
+(via AutoQuit).
 
 ## Which Emulator for What
 
