@@ -1,4 +1,4 @@
-# Claude Code for Macintosh SE — Specification
+# MacCode — Claude Code for the Macintosh SE
 
 **Status:** Draft for review
 **Date:** 2026-06-06
@@ -46,7 +46,7 @@ Three layers:
 
 ```
 ① Mac SE (System 7.0.1)        ② Modern Mac (proxy)            ③ Claude Code
-   Claude Code SE.app             claude-relay (TS/Node)          real session
+   MacCode.app             maccode-relay (TS/Node)          real session
    - Mac window UI         <TCP>  - listens on TCP :PORT   <SDK>  - your project dir
    - transcript / ✻ verb          - record ⇄ event xlate          - Read/Edit/Bash/…
    - Allow/Deny dialog            - UTF-8 ⇄ Mac Roman              - its own tools/loop
@@ -62,14 +62,14 @@ Three layers:
 
 ## 5. Components
 
-### 5.1 SE client app ("Claude Code SE", working title)
+### 5.1 SE client app — MacCode
 
 Language: C (Retro68), classic Mac Toolbox. Single application, one document window.
 
 **Window layout** (full screen, 512×342, minus the 20px menu bar):
 
 ```
-┌───────────────────────────────────────────────┐  ← title bar: "Claude Code"
+┌───────────────────────────────────────────────┐  ← title bar: "MacCode"
 │ transcript (scrollable)                      ▲ │
 │   > fix the parser bug                       ▒ │  ← scrollbar (right)
 │   I found the off-by-one in scan()…          ▒ │
@@ -100,9 +100,9 @@ Disconnected → Connecting → Idle ⇄ AwaitingResponse ⇄ AwaitingPermission
 
 **Text encoding:** The SE works in **Mac Roman**. All UTF-8 ⇄ Mac Roman transcoding happens in the proxy (§5.2); the SE treats record payloads as Mac Roman bytes and draws them directly.
 
-**Configuration:** The SE needs the proxy's host and port. v1: a "Connect…" dialog (and/or an editable `STR ` resource default) holding `host:port`, persisted in a small preferences file in the System Folder. Default host depends on the Basilisk II networking mode (see §9, §13).
+**Configuration:** The SE needs the proxy's host and port. v1: a "Connect…" dialog (and/or an editable `STR ` resource default) holding `host:port`, persisted in a small preferences file in the System Folder. Default host is the Basilisk II slirp gateway `10.0.2.2` (see §9).
 
-### 5.2 Proxy daemon ("claude-relay")
+### 5.2 Proxy daemon — maccode-relay
 
 Language: TypeScript on Node. Single long-running process started by Erik on the modern Mac.
 
@@ -156,7 +156,7 @@ Records ≤ 64 KB. The proxy chunks long assistant output across multiple `TEXT`
 
 | Type | Name | Payload | Meaning |
 |------|------|---------|---------|
-| `TEXT` | assistant text | Mac Roman text | A chunk of streamed assistant output; SE appends to transcript. |
+| `TEXT` | assistant text | Mac Roman text | One assistant text block, emitted as it completes; SE appends to transcript. (The Agent SDK surfaces whole assistant messages, not token-level deltas, so "streaming" is per assistant message, not per character.) |
 | `VERB` | status/verb | Mac Roman text | Current verb line ("Forging…"); empty payload clears it. |
 | `TOOL` | tool activity | Mac Roman text | A one-line tool-activity summary, e.g. `● Edit main.c (+12 −3)`. |
 | `ASK`  | permission request | id (uint32 BE) + Mac Roman text | Claude requests approval; text is a one-line description; `id` correlates the reply. |
@@ -226,7 +226,7 @@ proxy → INFO "Project: ~/code/myapp · session resumed"
 ## 9. Security considerations
 
 - **Plaintext on a trusted LAN.** The SE↔proxy link is unencrypted (the SE can't do TLS). This is acceptable only on a trusted local network. The proxy must **not** be exposed to untrusted networks.
-- **Bind address.** The proxy must bind to an address reachable by the emulated/real SE. With Basilisk II slirp networking the guest reaches the host via the slirp gateway; with bridged networking via the host's LAN IP. The proxy should bind to the specific reachable interface (configurable), **not** unconditionally `0.0.0.0`, and document the chosen address. (Exact addressing depends on Erik's working Basilisk II network config — see §13.)
+- **Bind address.** The emulated SE reaches the host through the Basilisk II slirp gateway at `10.0.2.2`; slirp forwards that to the host, so the proxy listens on the host. The exact bind interface (loopback vs the host's reachable interface) is confirmed by the connectivity spike before UI work. The proxy must **not** be exposed on untrusted networks.
 - **Auth stays on the modern Mac.** Anthropic credentials live only in the proxy/Claude Code; the SE holds nothing sensitive.
 - **Permission gating is real.** Tool approvals are surfaced to the user via `ASK`/`PERM`; the proxy must not auto-approve. The human at the SE is the approval authority, exactly as in real Claude Code.
 - **Single client.** v1 accepts one SE connection; this limits exposure and avoids multi-client state.
@@ -255,7 +255,7 @@ Per project policy: unit, integration, and end-to-end coverage. Split by where l
 ## 11. Build & run
 
 - **SE app:** a `add_application(...)` target in the project `CMakeLists.txt` (C sources + a `.r` resource file), built against the global Retro68 toolchain; deployed/tested via `scripts/run-basiliskii.sh`.
-- **Proxy:** a Node/TypeScript package (its own subdirectory, e.g. `proxy/`) with `npm` scripts (`build`, `start`, `test`); launched manually against a project directory.
+- **Proxy (`maccode-relay`):** a Node/TypeScript package in its own subdirectory (`proxy/`) with `npm` scripts (`build`, `start`, `test`); launched manually against a project directory.
 - A short top-level doc will describe the end-to-end dev loop: start proxy → launch SE app in Basilisk II → connect → iterate.
 
 ---
@@ -270,14 +270,14 @@ Per project policy: unit, integration, and end-to-end coverage. Split by where l
 
 ---
 
-## 13. Open questions / decisions to confirm
+## 13. Resolved decisions
 
-1. **Proxy↔SE addressing:** what IP/host does the SE dial in your Basilisk II MacTCP setup (slirp gateway vs bridged LAN IP)? This sets the proxy's bind address and the SE's default config.
-2. **App / product naming:** working titles are "Claude Code SE" (app) and "claude-relay" (proxy). Keep, or rename?
-3. **Reconnect/history:** v1 keeps only the transcript the SE already received across a reconnect (no history replay). Acceptable for v1?
-4. **Multiple clients:** v1 is single-client. Reject extra connections, or have a new connection take over? (Leaning: reject with an `ERR`.)
-5. **Project directory selection:** fixed at proxy launch via CLI arg/env. Confirm that's how you want to point it at a project.
-6. **Verb text source:** use the verbs Claude Code actually emits, or the SE picks its own random gerunds for flavor? (Leaning: use whatever the SDK surfaces; fall back to a small local list.)
+1. **Proxy↔SE addressing:** the SE dials the Basilisk II slirp gateway `10.0.2.2:<port>`; the proxy listens on the host. Confirmed by the connectivity spike before UI work.
+2. **Naming:** the SE app is **MacCode**; the proxy is **maccode-relay**.
+3. **Reconnect/history:** v1 keeps only the transcript already received; no history replay on reconnect.
+4. **Multiple clients:** single client only; the proxy rejects additional connections with an `ERR`.
+5. **Project directory:** fixed at proxy launch via CLI arg/env.
+6. **Verb text:** use the verbs the SDK surfaces; fall back to a small local gerund list when none is available.
 
 ---
 
