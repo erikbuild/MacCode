@@ -11,5 +11,9 @@ node_modules/
 /deps/*/*
 !/deps/*/README.md
 
+# Native test binaries (built by tests-native/Makefile)
+tests-native/test_wire
+tests-native/test_transcript
+
 # Superpowers brainstorming scratch (visual companion)
 .superpowers/
