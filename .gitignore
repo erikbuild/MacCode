@@ -9,3 +9,6 @@ build/
 # each subdir's README. See deps/<name>/README.md for what lives there.
 /deps/*/*
 !/deps/*/README.md
+
+# Superpowers brainstorming scratch (visual companion)
+.superpowers/
