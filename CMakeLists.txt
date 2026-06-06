@@ -8,12 +8,14 @@ add_application(MyApp
 
 add_application(maccode_spike
     src/spike_main.c
+    src/netmac.c
     src/TCPRoutines.c
     src/TCPHi.c
     resources/Spike.r
 )
 # Apple's MacTCP sample code mixes unsigned long / Ptr (safe on 68K)
-set_source_files_properties(src/TCPRoutines.c src/TCPHi.c PROPERTIES
+# netmac.c casts (StreamPtr)gStream for LowTCPStatus — same class of mismatch
+set_source_files_properties(src/TCPRoutines.c src/TCPHi.c src/netmac.c PROPERTIES
     COMPILE_FLAGS "-Wno-incompatible-pointer-types -Wno-int-conversion"
 )
 # GCC 16 defaults to C23 where 'bool' is a keyword; the vendored TCPRoutines.h

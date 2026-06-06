@@ -451,7 +451,11 @@ OSErr LowTCPStatus(StreamPtr streamPtr,TCPStatusPB *theStatus, GiveTimePtr giveT
 		if (*cancel == true)
 			return -1;
 	}
-	theStatus = &(pBlock->csParam.status);
+	/* FIX to vendored sample: copy status into the caller's struct before the
+	   param block is freed. The original did "theStatus = &pBlock->csParam.status",
+	   which only rebound the local pointer and left the caller's out-param dangling
+	   once the block was disposed. NetPoll is the first caller to read it. */
+	*theStatus = pBlock->csParam.status;
 	err = pBlock->ioResult;
 	DisposePtr((Ptr)pBlock);
 	return err;
