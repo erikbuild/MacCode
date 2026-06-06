@@ -2,7 +2,7 @@
 // ABOUTME: turn/verb orchestration, and permission ask/resolve round-trips.
 import net from "node:net";
 import { FrameDecoder, PROTOCOL_VERSION } from "./protocol";
-import { eventToFrames, verbFrame, clearVerbFrame, askFrame, infoFrame, parseClientFrame, type ClientAction } from "./translate";
+import { eventToFrames, framesForEvent, verbFrame, clearVerbFrame, askFrame, infoFrame, parseClientFrame, type ClientAction } from "./translate";
 import { verbForTurn } from "./verbs";
 import type { RelayEvent } from "./events";
 import type { PermissionAsk, PermissionFn } from "./session";
@@ -39,7 +39,7 @@ export function createServer(deps: ServerDeps): net.Server {
     const drop = (why: string) => { send(eventToFrames({ kind: "error", text: why })); sock.destroy(); };
 
     const onEvent = (ev: RelayEvent) => {
-      send(eventToFrames(ev));
+      for (const fb of framesForEvent(ev)) send(fb);
       if (ev.kind === "done") send(clearVerbFrame());
     };
 
