@@ -18,3 +18,23 @@ export function encodeFrame(type: number, payload: Buffer): Buffer {
   head.writeUInt16BE(payload.length, 1);
   return Buffer.concat([head, payload]);
 }
+
+export interface Frame { type: number; payload: Buffer; }
+
+export class FrameDecoder {
+  private buf = Buffer.alloc(0);
+
+  push(chunk: Buffer): Frame[] {
+    this.buf = Buffer.concat([this.buf, chunk]);
+    const frames: Frame[] = [];
+    while (this.buf.length >= 3) {
+      const len = this.buf.readUInt16BE(1);
+      if (this.buf.length < 3 + len) break;
+      const type = this.buf.readUInt8(0);
+      const payload = this.buf.subarray(3, 3 + len);
+      frames.push({ type, payload: Buffer.from(payload) });
+      this.buf = this.buf.subarray(3 + len);
+    }
+    return frames;
+  }
+}
