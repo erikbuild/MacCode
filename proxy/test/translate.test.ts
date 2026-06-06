@@ -1,7 +1,7 @@
 // ABOUTME: Tests for translate.ts — relay event → wire frame encoding.
 // ABOUTME: Verifies Mac Roman byte output, frame types, and helper constructors.
 import { describe, it, expect } from "vitest";
-import { eventToFrames, toolLine, verbFrame, clearVerbFrame, askFrame } from "../src/translate";
+import { eventToFrames, toolLine, verbFrame, clearVerbFrame, askFrame, parseClientFrame } from "../src/translate";
 import { RT, FrameDecoder } from "../src/protocol";
 
 function decode(bufs: Buffer[]) {
@@ -63,5 +63,34 @@ describe("verb and ask frames", () => {
     const d = new FrameDecoder();
     const f = d.push(askFrame(0xffffffff, "x"))[0];
     expect(f.payload.readUInt32BE(0)).toBe(0xffffffff);
+  });
+});
+
+describe("parseClientFrame", () => {
+  it("parses a PROMPT frame to a prompt action (Mac Roman -> UTF-8)", () => {
+    const action = parseClientFrame({ type: RT.PROMPT, payload: Buffer.from([0xa5, 0x20, 0x68, 0x69]) });
+    expect(action).toEqual({ kind: "prompt", text: "• hi" }); // 0xa5 -> bullet
+  });
+  it("parses a PERM allow frame", () => {
+    const p = Buffer.alloc(5); p.writeUInt32BE(7, 0); p.writeUInt8(1, 4);
+    expect(parseClientFrame({ type: RT.PERM, payload: p })).toEqual({ kind: "perm", id: 7, allow: true });
+  });
+  it("parses a PERM deny frame", () => {
+    const p = Buffer.alloc(5); p.writeUInt32BE(9, 0); p.writeUInt8(0, 4);
+    expect(parseClientFrame({ type: RT.PERM, payload: p })).toEqual({ kind: "perm", id: 9, allow: false });
+  });
+  it("parses STOP / NEW / RESUME / HELLO", () => {
+    expect(parseClientFrame({ type: RT.STOP, payload: Buffer.alloc(0) })).toEqual({ kind: "stop" });
+    expect(parseClientFrame({ type: RT.NEW, payload: Buffer.alloc(0) })).toEqual({ kind: "new" });
+    expect(parseClientFrame({ type: RT.RESUME, payload: Buffer.alloc(0) })).toEqual({ kind: "resume" });
+    const h = Buffer.alloc(2); h.writeUInt16BE(1, 0);
+    expect(parseClientFrame({ type: RT.HELLO, payload: h })).toEqual({ kind: "hello", version: 1 });
+  });
+  it("returns unknown for an unrecognized type byte", () => {
+    expect(parseClientFrame({ type: 0x7f, payload: Buffer.alloc(0) })).toEqual({ kind: "unknown", type: 0x7f });
+  });
+  it("throws on a short/malformed payload (caller drops the connection per spec §8)", () => {
+    expect(() => parseClientFrame({ type: RT.HELLO, payload: Buffer.alloc(0) })).toThrow();
+    expect(() => parseClientFrame({ type: RT.PERM, payload: Buffer.alloc(2) })).toThrow();
   });
 });

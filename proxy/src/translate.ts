@@ -1,7 +1,8 @@
 // ABOUTME: Converts relay events to encoded wire frames for the SE TCP connection.
 // ABOUTME: All text payloads are transcoded to Mac Roman before framing.
 import { RT, encodeFrame } from "./protocol";
-import { toMacRoman } from "./macroman";
+import type { Frame } from "./protocol";
+import { toMacRoman, fromMacRoman } from "./macroman";
 import type { RelayEvent } from "./events";
 
 export function toolLine(name: string, target?: string): string {
@@ -34,4 +35,25 @@ export function askFrame(id: number, description: string): Buffer {
 
 export function infoFrame(text: string): Buffer {
   return encodeFrame(RT.INFO, toMacRoman(text));
+}
+
+export type ClientAction =
+  | { kind: "hello"; version: number }
+  | { kind: "prompt"; text: string }
+  | { kind: "perm"; id: number; allow: boolean }
+  | { kind: "stop" }
+  | { kind: "new" }
+  | { kind: "resume" }
+  | { kind: "unknown"; type: number };
+
+export function parseClientFrame(f: Frame): ClientAction {
+  switch (f.type) {
+    case RT.HELLO:  return { kind: "hello", version: f.payload.readUInt16BE(0) };
+    case RT.PROMPT: return { kind: "prompt", text: fromMacRoman(f.payload) };
+    case RT.PERM:   return { kind: "perm", id: f.payload.readUInt32BE(0), allow: f.payload.readUInt8(4) === 1 };
+    case RT.STOP:   return { kind: "stop" };
+    case RT.NEW:    return { kind: "new" };
+    case RT.RESUME: return { kind: "resume" };
+    default:        return { kind: "unknown", type: f.type };
+  }
 }
