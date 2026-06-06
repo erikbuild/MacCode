@@ -27,6 +27,8 @@ cat > "$PREFS" <<EOF
 rom $BASILISKII_DIR/Quadra.rom
 disk $BASILISKII_DIR/System753.dsk
 extfs $SHARED_DIR
+ether slirp
+udptunnel false
 ramsize 67108864
 modelid 14
 cpu 4
