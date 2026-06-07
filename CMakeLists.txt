@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.9)
 project(MyApp C CXX)
 
 add_application(MyApp
-    src/main.c
+    src/myapp_main.c
     resources/MyApp.r
 )
 
@@ -21,3 +21,19 @@ set_source_files_properties(src/TCPRoutines.c src/TCPHi.c src/netmac.c PROPERTIE
 # GCC 16 defaults to C23 where 'bool' is a keyword; the vendored TCPRoutines.h
 # typedefs bool for C < C23, so compile the spike with C11 to stay compatible.
 set_target_properties(maccode_spike PROPERTIES C_STANDARD 11)
+
+add_application(MacCode
+    CREATOR "MCde"
+    resources/MacCode.r
+    src/main.c
+    src/netmac.c
+    src/proto.c
+    src/ui.c
+    src/wire.c
+    src/transcript.c
+    src/TCPRoutines.c
+    src/TCPHi.c
+)
+set_target_properties(MacCode PROPERTIES C_STANDARD 11)
+set_source_files_properties(src/TCPRoutines.c src/TCPHi.c src/netmac.c PROPERTIES
+    COMPILE_FLAGS "-Wno-incompatible-pointer-types -Wno-int-conversion")
