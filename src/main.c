@@ -23,12 +23,16 @@
 #define kWindowID      128
 #define kAlertID       128
 #define kAboutItem     1
-#define kQuitItem      4   /* File: New(1) Resume(2) -(3) Quit(4) */
+#define kNewItem       1   /* File menu: New(1) Resume(2) -(3) Quit(4) */
+#define kResumeItem    2
+#define kQuitItem      4
 #define kConnectItem    1
 #define kDisconnectItem 2
 #define kSleep          4L
+#define kConnectTimeoutTicks 600L   /* ~10s at 60 ticks/sec before giving up on a connect */
 
 AppGlobals gApp;
+static unsigned long gConnectDeadline = 0;   /* TickCount at which we abandon an in-progress connect */
 
 static void InitToolbox(void){
   InitGraf(&qd.thePort); InitFonts(); InitWindows(); InitMenus();
@@ -47,24 +51,56 @@ static void ShowMsg(const char *cmsg){
   NoteAlert(kAlertID, NULL);
 }
 void AppGiveTime(void){ SystemTask(); }
-static void DoConnect(void){
+/* Begin a non-blocking connect; the event loop's PumpConnect drives it to completion. */
+static void StartConnect(void){
   OSErr err;
-  if (NetIsConnected()) return;
-  gApp.state = ST_CONNECTING;
+  if (NetIsConnected() || gApp.state == ST_CONNECTING) return;
   WireDecoderInit(&gApp.dec);
-  err = NetConnect("10.0.2.2", 4242, AppGiveTime);
+  err = NetConnectBegin("10.0.2.2", 4242, AppGiveTime);
   if (err != noErr){
-    ShowMsg("Could not reach the proxy at 10.0.2.2:4242. Start it, then Session \xC9 Connect.");
     gApp.state = ST_ERROR;
-    UI_SetInputEnabled(false);
+    UI_SetVerb("");
+    TrAppend(gApp.transcript, "* could not start a connection", TR_ERR, UI_WrapCols());
+    UI_TranscriptChanged();
     return;
   }
-  ProtoSendHello();
-  gApp.state = ST_IDLE;
-  UI_SetInputEnabled(true);
+  gApp.state = ST_CONNECTING;
+  gConnectDeadline = TickCount() + kConnectTimeoutTicks;
+  UI_SetVerb("Connecting");
+}
+
+/* Tear down a failed/abandoned connect and report it in the transcript. */
+static void ConnectFailed(const char *why){
+  NetConnectCancel(AppGiveTime);   /* safe no-op if NetConnectPoll already cleaned up */
+  gApp.state = ST_DISCONNECTED;
+  UI_SetVerb("");
+  UI_SetInputEnabled(false);
+  TrAppend(gApp.transcript, why, TR_INFO, UI_WrapCols());
+  UI_TranscriptChanged();
+}
+
+/* Advance an in-progress connect; called each idle pass. */
+static void PumpConnect(void){
+  int r;
+  if (gApp.state != ST_CONNECTING) return;
+  r = NetConnectPoll(AppGiveTime);
+  if (r == 1){                                  /* still connecting */
+    if ((long)(TickCount() - gConnectDeadline) >= 0)
+      ConnectFailed("* could not reach the proxy (10.0.2.2:4242) \xD0 Session \xC9 Connect to retry");
+    return;
+  }
+  if (r == 0){                                  /* connected */
+    ProtoSendHello();
+    gApp.state = ST_IDLE;
+    UI_SetVerb("");
+    UI_SetInputEnabled(true);
+    return;
+  }
+  ConnectFailed("* could not connect \xD0 Session \xC9 Connect to retry");   /* r < 0 */
 }
 static void DoDisconnect(void){
-  if (NetIsConnected()) NetClose(AppGiveTime);
+  if (gApp.state == ST_CONNECTING) NetConnectCancel(AppGiveTime);
+  else if (NetIsConnected()) NetClose(AppGiveTime);
   gApp.state = ST_DISCONNECTED;
   UI_SetVerb("");
   UI_SetInputEnabled(false);
@@ -109,10 +145,11 @@ static void HandleMenu(long mc){
     if (item == kAboutItem) ShowMsg("MacCode \xC9 Claude Code for the Macintosh SE");
     else { Str255 nm; GetMenuItemText(GetMenuHandle(kAppleMenuID), item, nm); OpenDeskAcc(nm); }
   } else if (id == kFileMenuID){
-    if (item == kQuitItem) gApp.quitting = true;
-    /* New / Resume wired in Task 5.8 */
+    if (item == kNewItem)         { if (NetIsConnected()) ProtoSendNew(); }
+    else if (item == kResumeItem) { if (NetIsConnected()) ProtoSendResume(); }
+    else if (item == kQuitItem)   gApp.quitting = true;
   } else if (id == kSessionMenuID){
-    if (item == kConnectItem) DoConnect();
+    if (item == kConnectItem) StartConnect();
     else if (item == kDisconnectItem) DoDisconnect();
   }
   HiliteMenu(0);
@@ -133,7 +170,7 @@ int main(void){
   UI_SetInputEnabled(false);   /* enabled on successful connect */
   UI_Update();                 /* paint the empty window before the (possibly slow) connect */
   NetInit();                   /* open the MacTCP driver once before connecting */
-  DoConnect();
+  StartConnect();
 
   while (!gApp.quitting){
     if (WaitNextEvent(everyEvent, &ev, kSleep, NULL)){
@@ -151,6 +188,9 @@ int main(void){
         case keyDown: case autoKey: {
           char c = (char)(ev.message & charCodeMask);
           if (ev.modifiers & cmdKey){ long mc = MenuKey(c); if (HiWord(mc)) HandleMenu(mc); }
+          else if (c == 0x1B){                   /* esc — interrupt the current turn */
+            if (gApp.state == ST_AWAITING_RESPONSE){ ProtoSendStop(); UI_SetVerb("Stopping"); }
+          }
           else {
             if (UI_InputKey(&ev)){               /* unmodified Return in the input box */
               if (gApp.state == ST_IDLE){
@@ -178,8 +218,11 @@ int main(void){
       }
     } else {
       UI_Idle();
+      PumpConnect();
       PumpNetwork();
     }
   }
+  if (gApp.state == ST_CONNECTING) NetConnectCancel(AppGiveTime);
+  else if (NetIsConnected()) NetClose(AppGiveTime);
   return 0;
 }

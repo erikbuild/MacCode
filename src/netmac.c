@@ -11,6 +11,8 @@
 static unsigned long gStream    = 0;
 static Boolean       gConnected = false;
 static bool          gCancel    = false;
+static Boolean       gConnecting = false;
+static TCPiopb      *gOpenPB     = NULL;   /* async active-open block while connecting */
 
 /* Releases the stream and its receive buffer, then marks us disconnected.
    ReleaseStream is the correct way to free buffers even on an already
@@ -51,6 +53,53 @@ OSErr NetConnect(const char *dottedQuad, unsigned short port, NetGiveTime giveTi
     gConnected = true;
     gCancel    = false;
     return noErr;
+}
+
+/* Begin a non-blocking connect: create the stream and issue an async active open.
+   Returns noErr if the open was issued (poll with NetConnectPoll), else an error. */
+OSErr NetConnectBegin(const char *dottedQuad, unsigned short port, NetGiveTime giveTime) {
+    OSErr err;
+    unsigned long ip = parseIP(dottedQuad);
+    if (gConnected || gConnecting) return (OSErr)-1;
+    if (ip == 0) return (OSErr)-1;
+    err = CreateStream(&gStream, NET_RECV_BUF, (GiveTimePtr)giveTime, &gCancel);
+    if (err != noErr) { gStream = 0; return err; }
+    gCancel = false;
+    err = LowTCPOpenConnectionAsync((StreamPtr)gStream, 30, (ip_addr)ip, (tcp_port)port, 0, &gOpenPB);
+    if (err != noErr) {
+        ReleaseStream(gStream, (GiveTimePtr)giveTime, &gCancel);
+        gStream = 0; gOpenPB = NULL;
+        return err;
+    }
+    gConnecting = true;
+    return noErr;
+}
+
+/* Poll an in-progress connect: 1 = still connecting, 0 = connected, -1 = failed/torn down. */
+int NetConnectPoll(NetGiveTime giveTime) {
+    OSErr err;
+    if (gConnected) return 0;
+    if (!gConnecting || gOpenPB == NULL) return -1;
+    if (gOpenPB->ioResult > 0) return 1;            /* driver hasn't completed the open yet */
+    err = LowFinishTCPOpenConn(gOpenPB);            /* read result + dispose the block */
+    gOpenPB = NULL;
+    gConnecting = false;
+    if (err == noErr) { gConnected = true; return 0; }
+    if (gStream) { ReleaseStream(gStream, (GiveTimePtr)giveTime, &gCancel); gStream = 0; }
+    return -1;
+}
+
+/* Abort an in-progress connect and release the stream. No-op if not connecting. */
+void NetConnectCancel(NetGiveTime giveTime) {
+    if (!gConnecting) return;
+    if (gOpenPB) {
+        LowKillTCP(gOpenPB);                        /* abort the pending open */
+        while (gOpenPB->ioResult > 0) (*giveTime)();/* completes ~immediately after the kill */
+        DisposePtr((Ptr)gOpenPB);
+        gOpenPB = NULL;
+    }
+    if (gStream) { ReleaseStream(gStream, (GiveTimePtr)giveTime, &gCancel); gStream = 0; }
+    gConnecting = false;
 }
 
 Boolean NetIsConnected(void) {

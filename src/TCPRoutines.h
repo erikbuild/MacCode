@@ -55,6 +55,17 @@ OSErr LowTCPOpenConnection(				/* actively attempts to connect to a host	*/
 	GiveTimePtr giveTimePtr,
 	bool* cancel);
 
+OSErr LowTCPOpenConnectionAsync(		/* like LowTCPOpenConnection, issued asynchronously */
+	StreamPtr streamPtr,					/* stream to use for this connection	*/
+	SInt8 timeout,							/* timeout value for open				*/
+	ip_addr remoteHost,						/* ip number of host to connect to		*/
+	tcp_port remotePort,					/* tcp port number of host to connect to*/
+	tcp_port localPort,						/* local port (0 = MacTCP chooses)		*/
+	TCPiopb **returnBlock);					/* parameter block used (returned)		*/
+
+OSErr LowFinishTCPOpenConn(				/* called when an async open completes		*/
+	TCPiopb *pBlock);						/* parameter block used in the call		*/
+
 OSErr LowTCPSendData(					/* send data along an open connection		*/
 	StreamPtr streamPtr,					/* stream identifier to send data on	*/
 	SInt8 timeout,							/* timeout for this send				*/

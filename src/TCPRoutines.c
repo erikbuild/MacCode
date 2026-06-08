@@ -199,6 +199,56 @@ OSErr LowTCPOpenConnection(StreamPtr streamPtr, SInt8 timeout,ip_addr remoteHost
 }
 
 
+/* Like LowTCPOpenConnection but issued asynchronously: returns immediately with the
+   parameter block via returnBlock.  Poll pBlock->ioResult ( >0 means still in progress );
+   once it is <= 0 the open has completed -- call LowFinishTCPOpenConn to read the result
+   and dispose the block. */
+
+OSErr LowTCPOpenConnectionAsync(StreamPtr streamPtr, SInt8 timeout, ip_addr remoteHost,
+			tcp_port remotePort, tcp_port localPort, TCPiopb **returnBlock)
+{
+	OSErr err;
+	TCPiopb *pBlock;
+
+	if ((err = NewBlock(&pBlock)) != noErr)
+		return err;
+
+	pBlock->csCode = TCPActiveOpen;
+	pBlock->ioResult = 1;
+	pBlock->ioCompletion = nil;
+	pBlock->tcpStream = streamPtr;
+	pBlock->csParam.open.ulpTimeoutValue = timeout;
+	pBlock->csParam.open.ulpTimeoutAction = 1;
+	pBlock->csParam.open.validityFlags = 0xC0;
+	pBlock->csParam.open.commandTimeoutValue = timeout;
+	pBlock->csParam.open.remoteHost = remoteHost;
+	pBlock->csParam.open.remotePort = remotePort;
+	pBlock->csParam.open.localPort = localPort;
+	pBlock->csParam.open.tosFlags = 0;
+	pBlock->csParam.open.precedence = 0;
+	pBlock->csParam.open.dontFrag = 0;
+	pBlock->csParam.open.timeToLive = 0;
+	pBlock->csParam.open.security = 0;
+	pBlock->csParam.open.optionCnt = 0;
+	PBControl((ParmBlkPtr)pBlock,true);		/* async -- do NOT spin on ioResult */
+
+	*returnBlock = pBlock;
+	return noErr;
+}
+
+
+/* Reads the result of a completed async open (pBlock->ioResult <= 0) and frees the block. */
+
+OSErr LowFinishTCPOpenConn(TCPiopb *pBlock)
+{
+	OSErr err;
+
+	err = pBlock->ioResult;
+	DisposePtr((Ptr)pBlock);
+	return err;
+}
+
+
 /* This routine should be called when a TCPSendData call completes.  It returns the
    error code generated upon completion of the CallTCPSend. */
 
