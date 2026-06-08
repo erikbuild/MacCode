@@ -43,6 +43,17 @@ resource 'DITL' (128) {
       {10, 20, 100, 382}, StaticText { disabled, "^0" } }
 };
 
+resource 'ALRT' (129) {
+    {60, 60, 210, 452}, 129,
+    { OK, visible, sound1; OK, visible, sound1; OK, visible, sound1; OK, visible, sound1 },
+    alertPositionMainScreen
+};
+resource 'DITL' (129) {
+    { {120, 312, 140, 382}, Button { enabled, "Allow" };
+      {120, 222, 140, 302}, Button { enabled, "Deny" };
+      {10, 70, 110, 382}, StaticText { disabled, "^0" } }
+};
+
 resource 'SIZE' (-1) {
     reserved, acceptSuspendResumeEvents, reserved, canBackground,
     doesActivateOnFGSwitch, backgroundAndForeground, dontGetFrontClicks,

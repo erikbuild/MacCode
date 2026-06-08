@@ -21,4 +21,7 @@ void    UI_SetVerb(const char *verb);   /* "" clears */
 void    UI_SetInputEnabled(Boolean on);
 void    UI_Idle(void);                  /* TEIdle for the caret */
 
+/* Modal tool-permission prompt. desc = Mac Roman bytes (len). Returns true=Allow, false=Deny. */
+Boolean UI_ShowPermission(const char *desc, short len);
+
 #endif

@@ -4,15 +4,18 @@
 #include <Fonts.h>
 #include <Windows.h>
 #include <TextEdit.h>
+#include <Dialogs.h>
 #include <Multiverse.h>
 #include <string.h>
 #include "app.h"
 #include "transcript.h"
 #include "ui.h"
 
-#define SCROLLBAR_W 15
-#define INPUT_H     40   /* bottom strip reserved for input + verb (filled in 5.5) */
-#define LMARGIN      3
+#define SCROLLBAR_W    15
+#define INPUT_H        40   /* bottom strip reserved for input + verb (filled in 5.5) */
+#define LMARGIN         3
+#define kPermAlertID   129
+#define kPermAllowItem  1
 
 static ControlHandle  gVScroll = NULL;
 static short          gFontNum;     /* Monaco */
@@ -259,4 +262,17 @@ void UI_SetInputEnabled(Boolean on) {
 
 void UI_Idle(void) {
     if (gTE && gInputEnabled) TEIdle(gTE);
+}
+
+Boolean UI_ShowPermission(const char *desc, short len) {
+    Str255 p;
+    short  n = len;
+    short  hit;
+    if (n < 0)   n = 0;
+    if (n > 255) n = 255;          /* Str255 holds at most 255 bytes */
+    p[0] = (unsigned char)n;
+    if (n > 0) memcpy(p + 1, desc, (size_t)n);   /* copy NOW — payload is transient */
+    ParamText(p, "\p", "\p", "\p");
+    hit = CautionAlert(kPermAlertID, NULL);
+    return (Boolean)(hit == kPermAllowItem);
 }

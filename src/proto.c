@@ -101,18 +101,16 @@ void ProtoDispatch(const WireFrame *f){
       UI_SetInputEnabled(true);
       break;
     case RT_ASK: {
-      /* TEMP for 5.6: no dialog yet (that's Task 5.7). Auto-deny so the turn can continue,
-         and drop a visible note. Real Allow/Deny dialog replaces this in 5.7. */
-      /* \xD0 is the Mac Roman em dash. */
-      static const char kAutoDenyNote[] = "(tool request auto-denied \xD0 permission UI in 5.7)";
       if (f->len >= 4){
+        Boolean allow;
         gApp.pendingAskId = ReadU32BE(f->payload);
-        ProtoSendPerm(gApp.pendingAskId, false);
+        gApp.state = ST_AWAITING_PERMISSION;
+        /* UI_ShowPermission copies the description before running the modal, so the
+           transient payload pointer is safe. */
+        allow = UI_ShowPermission((const char *)(f->payload + 4), (short)(f->len - 4));
+        ProtoSendPerm(gApp.pendingAskId, allow);
         gApp.pendingAskId = 0;
-        AppendPayload((const unsigned char *)kAutoDenyNote,
-                      (unsigned short)(sizeof(kAutoDenyNote) - 1), TR_INFO);
-        UI_TranscriptChanged();
-        gApp.state = ST_AWAITING_RESPONSE;
+        gApp.state = ST_AWAITING_RESPONSE;   /* turn continues after the decision */
       }
       break;
     }
