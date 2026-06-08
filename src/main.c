@@ -12,6 +12,8 @@
 #include <OSUtils.h>
 #include "app.h"
 #include "ui.h"
+#include "proto.h"
+#include "netmac.h"
 
 #define kMBARID        128
 #define kAppleMenuID   128
@@ -22,6 +24,9 @@
 #define kAlertID       128
 #define kAboutItem     1
 #define kQuitItem      4   /* File: New(1) Resume(2) -(3) Quit(4) */
+#define kConnectItem    1
+#define kDisconnectItem 2
+#define kSleep          4L
 
 AppGlobals gApp;
 
@@ -41,6 +46,63 @@ static void ShowMsg(const char *cmsg){
   ParamText(p, "\p", "\p", "\p");
   NoteAlert(kAlertID, NULL);
 }
+void AppGiveTime(void){ SystemTask(); }
+static void DoConnect(void){
+  OSErr err;
+  if (NetIsConnected()) return;
+  gApp.state = ST_CONNECTING;
+  WireDecoderInit(&gApp.dec);
+  err = NetConnect("10.0.2.2", 4242, AppGiveTime);
+  if (err != noErr){
+    ShowMsg("Could not reach the proxy at 10.0.2.2:4242. Start it, then Session \xC9 Connect.");
+    gApp.state = ST_ERROR;
+    UI_SetInputEnabled(false);
+    return;
+  }
+  ProtoSendHello();
+  gApp.state = ST_IDLE;
+  UI_SetInputEnabled(true);
+}
+static void DoDisconnect(void){
+  if (NetIsConnected()) NetClose(AppGiveTime);
+  gApp.state = ST_DISCONNECTED;
+  UI_SetVerb("");
+  UI_SetInputEnabled(false);
+}
+static void PumpNetwork(void){
+  static unsigned char tmp[2048];
+  WireFrame fr;
+  unsigned short room, want;
+  long n;
+  int r;
+
+  if (!NetIsConnected()) return;
+  room = (unsigned short)(WIRE_BUF_SIZE - gApp.dec.used);
+  if (room == 0) return;                       /* full frame buffered but undrained — shouldn't happen */
+  /* NetPoll spends 1 byte of maxLen on its NUL terminator (and refuses maxLen<2), so ask for
+     room+1 (capped to tmp) — this lets us deliver a frame's final byte even when only 1 byte of
+     decoder room remains. tmp is always >= maxLen, so the NUL stays in bounds. */
+  want = (room + 1 < (unsigned short)sizeof(tmp)) ? (unsigned short)(room + 1) : (unsigned short)sizeof(tmp);
+  n = NetPoll(tmp, want, AppGiveTime);
+  if (n < 0){                                 /* socket closed/errored */
+    DoDisconnect();
+    TrAppend(gApp.transcript, "* disconnected", TR_INFO, UI_WrapCols());
+    UI_TranscriptChanged();
+    return;
+  }
+  if (n == 0) return;
+  r = WireDecoderPush(&gApp.dec, tmp, (unsigned short)n, &fr);
+  while (r == 1){
+    ProtoDispatch(&fr);
+    r = WireDecoderPush(&gApp.dec, NULL, 0, &fr);
+  }
+  if (r < 0){                                 /* fatal protocol error */
+    DoDisconnect();
+    WireDecoderInit(&gApp.dec);
+    TrAppend(gApp.transcript, "* protocol error \xD0 disconnected", TR_ERR, UI_WrapCols());
+    UI_TranscriptChanged();
+  }
+}
 static void HandleMenu(long mc){
   short id = HiWord(mc), item = LoWord(mc);
   if (id == kAppleMenuID){
@@ -50,7 +112,8 @@ static void HandleMenu(long mc){
     if (item == kQuitItem) gApp.quitting = true;
     /* New / Resume wired in Task 5.8 */
   } else if (id == kSessionMenuID){
-    /* Connect / Disconnect wired in Task 5.6 */
+    if (item == kConnectItem) DoConnect();
+    else if (item == kDisconnectItem) DoDisconnect();
   }
   HiliteMenu(0);
 }
@@ -67,28 +130,13 @@ int main(void){
   gApp.state = ST_DISCONNECTED; gApp.quitting = false;
   gApp.verb[0] = '\0'; gApp.pendingAskId = 0; gApp.scrollTop = 0;
   UI_Init();
-  /* TEMP seed — removed when real data flows (Task 5.6) */
-  { int k; char b[32];
-    TrAppend(gApp.transcript, "> fix the parser bug", TR_USER, UI_WrapCols());
-    TrAppend(gApp.transcript, "I found the off-by-one in scan() and patched it; re-running the tests now to confirm nothing else regressed before moving on.", TR_ASSISTANT, UI_WrapCols());
-    TrAppend(gApp.transcript, "\xA5 Read main.c", TR_TOOL, UI_WrapCols());
-    TrAppend(gApp.transcript, "\xA5 Edit main.c", TR_TOOL, UI_WrapCols());
-    for (k = 0; k < 40; k++) {
-      const char *p = "line ";
-      int j = 0;
-      while (p[j]) { b[j] = p[j]; j++; }
-      b[j++] = (char)('0' + (k / 10));
-      b[j++] = (char)('0' + (k % 10));
-      b[j] = 0;
-      TrAppend(gApp.transcript, b, TR_ASSISTANT, UI_WrapCols());
-    }
-    UI_TranscriptChanged();
-  }
-  /* END TEMP seed */
-  UI_SetVerb("Forging");  /* TEMP: verb-line render check (removed in 5.6) */
+  UI_SetInputEnabled(false);   /* enabled on successful connect */
+  UI_Update();                 /* paint the empty window before the (possibly slow) connect */
+  NetInit();                   /* open the MacTCP driver once before connecting */
+  DoConnect();
 
   while (!gApp.quitting){
-    if (WaitNextEvent(everyEvent, &ev, 10L, NULL)){
+    if (WaitNextEvent(everyEvent, &ev, kSleep, NULL)){
       switch (ev.what){
         case mouseDown: {
           WindowPtr w; short part = FindWindow(ev.where, &w);
@@ -104,10 +152,20 @@ int main(void){
           char c = (char)(ev.message & charCodeMask);
           if (ev.modifiers & cmdKey){ long mc = MenuKey(c); if (HiWord(mc)) HandleMenu(mc); }
           else {
-            /* TEMP: echo typed line into transcript (real send wired in 5.6) */
-            if (UI_InputKey(&ev)){
-              char line[512]; UI_GetInput(line, sizeof line);
-              if (line[0]){ TrAppend(gApp.transcript, line, TR_USER, UI_WrapCols()); UI_ClearInput(); UI_TranscriptChanged(); }
+            if (UI_InputKey(&ev)){               /* unmodified Return in the input box */
+              if (gApp.state == ST_IDLE){
+                char line[512];
+                UI_GetInput(line, sizeof line);
+                if (line[0]){
+                  TrAppend(gApp.transcript, line, TR_USER, UI_WrapCols());
+                  ProtoSendPrompt(line);
+                  UI_ClearInput();
+                  UI_TranscriptChanged();
+                  gApp.state = ST_AWAITING_RESPONSE;
+                  UI_SetInputEnabled(false);
+                }
+              }
+              /* not idle: ignore Return */
             }
           }
         } break;
@@ -120,6 +178,7 @@ int main(void){
       }
     } else {
       UI_Idle();
+      PumpNetwork();
     }
   }
   return 0;

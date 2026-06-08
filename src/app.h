@@ -23,4 +23,6 @@ typedef struct {
 
 extern AppGlobals gApp;
 #define kProtocolVersion 1
+
+void AppGiveTime(void);   /* SystemTask-only give-time callback for blocking MacTCP calls */
 #endif
