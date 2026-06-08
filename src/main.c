@@ -85,6 +85,7 @@ int main(void){
     UI_TranscriptChanged();
   }
   /* END TEMP seed */
+  UI_SetVerb("Forging");  /* TEMP: verb-line render check (removed in 5.6) */
 
   while (!gApp.quitting){
     if (WaitNextEvent(everyEvent, &ev, 10L, NULL)){
@@ -100,9 +101,15 @@ int main(void){
           }
         } break;
         case keyDown: case autoKey: {
-          char c = ev.message & charCodeMask;
+          char c = (char)(ev.message & charCodeMask);
           if (ev.modifiers & cmdKey){ long mc = MenuKey(c); if (HiWord(mc)) HandleMenu(mc); }
-          /* text input handled in 5.5 */
+          else {
+            /* TEMP: echo typed line into transcript (real send wired in 5.6) */
+            if (UI_InputKey(&ev)){
+              char line[512]; UI_GetInput(line, sizeof line);
+              if (line[0]){ TrAppend(gApp.transcript, line, TR_USER, UI_WrapCols()); UI_ClearInput(); UI_TranscriptChanged(); }
+            }
+          }
         } break;
         case updateEvt: {
           WindowPtr uw = (WindowPtr)ev.message;
@@ -111,6 +118,8 @@ int main(void){
           EndUpdate(uw);
         } break;
       }
+    } else {
+      UI_Idle();
     }
   }
   return 0;
