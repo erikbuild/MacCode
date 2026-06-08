@@ -1,7 +1,7 @@
 // ABOUTME: Tests for translate.ts — relay event → wire frame encoding.
 // ABOUTME: Verifies Mac Roman byte output, frame types, and helper constructors.
 import { describe, it, expect } from "vitest";
-import { eventToFrames, toolLine, verbFrame, clearVerbFrame, askFrame, parseClientFrame } from "../src/translate";
+import { eventToFrames, framesForEvent, toolLine, verbFrame, clearVerbFrame, askFrame, parseClientFrame } from "../src/translate";
 import { RT, FrameDecoder } from "../src/protocol";
 
 function decode(bufs: Buffer[]) {
@@ -92,5 +92,40 @@ describe("parseClientFrame", () => {
   it("throws on a short/malformed payload (caller drops the connection per spec §8)", () => {
     expect(() => parseClientFrame({ type: RT.HELLO, payload: Buffer.alloc(0) })).toThrow();
     expect(() => parseClientFrame({ type: RT.PERM, payload: Buffer.alloc(2) })).toThrow();
+  });
+});
+
+describe("framesForEvent chunking", () => {
+  it("splits long text into multiple TEXT frames <=4093 bytes and reassembles", () => {
+    const big = "a".repeat(10000);
+    const d = new FrameDecoder();
+    const frames = framesForEvent({ kind: "text", text: big }).flatMap(b => d.push(b));
+    expect(frames.length).toBeGreaterThan(1);
+    for (const f of frames) { expect(f.type).toBe(RT.TEXT); expect(f.payload.length).toBeLessThanOrEqual(4093); }
+    expect(Buffer.concat(frames.map(f => f.payload)).toString()).toBe(big);
+  });
+  it("short text is a single TEXT frame; done is a single empty DONE frame", () => {
+    const d = new FrameDecoder();
+    expect(framesForEvent({ kind: "text", text: "hi" }).flatMap(b => d.push(b)).map(f => f.type)).toEqual([RT.TEXT]);
+    const d2 = new FrameDecoder();
+    const done = framesForEvent({ kind: "done" }).flatMap(b => d2.push(b));
+    expect(done.map(f => f.type)).toEqual([RT.DONE]);
+    expect(done[0].payload.length).toBe(0);
+  });
+  it("tool/info/error payloads are chunked too", () => {
+    const d = new FrameDecoder();
+    const frames = framesForEvent({ kind: "info", text: "x".repeat(9000) }).flatMap(b => d.push(b));
+    expect(frames.length).toBeGreaterThan(1);
+    frames.forEach(f => { expect(f.type).toBe(RT.INFO); expect(f.payload.length).toBeLessThanOrEqual(4093); });
+  });
+});
+
+describe("askFrame truncation", () => {
+  it("caps the description so an ASK frame fits the SE buffer", () => {
+    const d = new FrameDecoder();
+    const fr = d.push(askFrame(7, "x".repeat(5000)))[0];
+    expect(fr.type).toBe(RT.ASK);
+    expect(fr.payload.readUInt32BE(0)).toBe(7);
+    expect(fr.payload.length).toBeLessThanOrEqual(4093);
   });
 });

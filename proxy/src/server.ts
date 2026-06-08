@@ -2,10 +2,11 @@
 // ABOUTME: turn/verb orchestration, and permission ask/resolve round-trips.
 import net from "node:net";
 import { FrameDecoder, PROTOCOL_VERSION } from "./protocol";
-import { eventToFrames, verbFrame, clearVerbFrame, askFrame, infoFrame, parseClientFrame, type ClientAction } from "./translate";
+import { eventToFrames, framesForEvent, verbFrame, clearVerbFrame, askFrame, infoFrame, parseClientFrame, type ClientAction } from "./translate";
 import { verbForTurn } from "./verbs";
 import type { RelayEvent } from "./events";
 import type { PermissionAsk, PermissionFn } from "./session";
+import { log } from "./log";
 
 export interface SessionLike {
   start(mode: "new" | "resume"): void;
@@ -23,12 +24,15 @@ export function createServer(deps: ServerDeps): net.Server {
   let active: net.Socket | null = null;
 
   return net.createServer((sock) => {
+    const who = `${sock.remoteAddress}:${sock.remotePort}`;
     if (active) {
+      log(`reject ${who}: already serving a client`);
       sock.write(eventToFrames({ kind: "error", text: "MacCode proxy is busy (one client only)." }));
       sock.end();
       return;
     }
     active = sock;
+    log(`client connected: ${who}`);
 
     const dec = new FrameDecoder();
     let turn = 0;
@@ -36,10 +40,16 @@ export function createServer(deps: ServerDeps): net.Server {
     const pending = new Map<number, (allow: boolean) => void>();
 
     const send = (buf: Buffer) => { if (!sock.destroyed) sock.write(buf); };
-    const drop = (why: string) => { send(eventToFrames({ kind: "error", text: why })); sock.destroy(); };
+    const drop = (why: string) => { log(`drop ${who}: ${why}`); send(eventToFrames({ kind: "error", text: why })); sock.destroy(); };
 
     const onEvent = (ev: RelayEvent) => {
-      send(eventToFrames(ev));
+      const extra =
+        ev.kind === "text" ? ` ${ev.text.length}b` :
+        ev.kind === "info" ? ` ${JSON.stringify(ev.text)}` :
+        ev.kind === "error" ? ` ${JSON.stringify(ev.text)}` :
+        ev.kind === "tool" ? ` ${ev.name}` : "";
+      log(`-> ${ev.kind}${extra}`);
+      for (const fb of framesForEvent(ev)) send(fb);
       if (ev.kind === "done") send(clearVerbFrame());
     };
 
@@ -63,6 +73,7 @@ export function createServer(deps: ServerDeps): net.Server {
         }
         switch (a.kind) {
           case "hello":
+            log(`<- hello v${a.version}`);
             if (a.version !== PROTOCOL_VERSION) {
               drop(`Unsupported protocol version ${a.version} (proxy speaks ${PROTOCOL_VERSION}).`);
               return;
@@ -71,22 +82,27 @@ export function createServer(deps: ServerDeps): net.Server {
             send(infoFrame(`Project: ${deps.cwdLabel}`));
             break;
           case "prompt":
+            log(`<- prompt ${JSON.stringify(a.text.slice(0, 80))}`);
             send(verbFrame(verbForTurn(turn++)));
             session.prompt(a.text);
             break;
           case "perm": {
+            log(`<- perm id=${a.id} ${a.allow ? "allow" : "deny"}`);
             const r = pending.get(a.id);
             if (r) { pending.delete(a.id); r(a.allow); }
             break;
           }
           case "stop":
+            log("<- stop");
             void session.interrupt();
             break;
           case "new":
+            log("<- new");
             session.start("new");
             send(infoFrame("New conversation."));
             break;
           case "resume":
+            log("<- resume");
             session.start("resume");
             send(infoFrame("Resumed most recent conversation."));
             break;
@@ -106,7 +122,7 @@ export function createServer(deps: ServerDeps): net.Server {
       pending.clear();
       if (active === sock) active = null;
     };
-    sock.on("close", cleanup);
-    sock.on("error", cleanup);
+    sock.on("close", () => { log(`client disconnected: ${who}`); cleanup(); });
+    sock.on("error", (err) => { log(`socket error ${who}: ${err.message}`); cleanup(); });
   });
 }
