@@ -9,6 +9,7 @@ import type {
   PermissionResult,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { RelayEvent } from "./events";
+import { log } from "./log";
 
 export interface PermissionAsk {
   toolName: string;
@@ -104,6 +105,7 @@ export class Session {
   }
 
   start(mode: "new" | "resume") {
+    log(`session.start (${mode})`);
     const myId = ++this.runId;
     // Tear down any prior run so a stale pump/queue can't keep emitting.
     this.queue.close();
@@ -152,7 +154,9 @@ export class Session {
       }
     } catch (err) {
       if (myId !== this.runId) return;
-      this.opts.onEvent({ kind: "error", text: err instanceof Error ? err.message : String(err) });
+      const text = err instanceof Error ? err.message : String(err);
+      log(`session error: ${text}`);
+      this.opts.onEvent({ kind: "error", text });
       this.opts.onEvent({ kind: "done" });
     }
   }
@@ -164,11 +168,13 @@ export class Session {
         if (block.type === "text") {
           this.opts.onEvent({ kind: "text", text: block.text });
         } else if (block.type === "tool_use") {
+          log(`tool_use: ${block.name}`);
           this.opts.onEvent({ kind: "tool", name: block.name, target: toolTarget(block.name, block.input) });
         }
       }
     } else if (msg.type === "result") {
       if (msg.subtype !== "success") {
+        log(`result error: ${describeResultError(msg)}`);
         this.opts.onEvent({ kind: "error", text: describeResultError(msg) });
       }
       this.opts.onEvent({ kind: "done" });
