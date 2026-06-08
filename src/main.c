@@ -11,6 +11,7 @@
 #include <Devices.h>
 #include <OSUtils.h>
 #include "app.h"
+#include "ui.h"
 
 #define kMBARID        128
 #define kAppleMenuID   128
@@ -65,6 +66,25 @@ int main(void){
   SetPort(gApp.win);
   gApp.state = ST_DISCONNECTED; gApp.quitting = false;
   gApp.verb[0] = '\0'; gApp.pendingAskId = 0; gApp.scrollTop = 0;
+  UI_Init();
+  /* TEMP seed — removed when real data flows (Task 5.6) */
+  { int k; char b[32];
+    TrAppend(gApp.transcript, "> fix the parser bug", TR_USER, UI_WrapCols());
+    TrAppend(gApp.transcript, "I found the off-by-one in scan() and patched it; re-running the tests now to confirm nothing else regressed before moving on.", TR_ASSISTANT, UI_WrapCols());
+    TrAppend(gApp.transcript, "\xA5 Read main.c", TR_TOOL, UI_WrapCols());
+    TrAppend(gApp.transcript, "\xA5 Edit main.c", TR_TOOL, UI_WrapCols());
+    for (k = 0; k < 40; k++) {
+      const char *p = "line ";
+      int j = 0;
+      while (p[j]) { b[j] = p[j]; j++; }
+      b[j++] = (char)('0' + (k / 10));
+      b[j++] = (char)('0' + (k % 10));
+      b[j] = 0;
+      TrAppend(gApp.transcript, b, TR_ASSISTANT, UI_WrapCols());
+    }
+    UI_TranscriptChanged();
+  }
+  /* END TEMP seed */
 
   while (!gApp.quitting){
     if (WaitNextEvent(everyEvent, &ev, 10L, NULL)){
@@ -75,7 +95,7 @@ int main(void){
             case inMenuBar: HandleMenu(MenuSelect(ev.where)); break;
             case inDrag:    DragWindow(w, ev.where, &qd.screenBits.bounds); break;
             case inGoAway:  if (TrackGoAway(w, ev.where)) gApp.quitting = true; break;
-            case inContent: if (w != FrontWindow()) SelectWindow(w); break;  /* transcript clicks in 5.4 */
+            case inContent: if (w != FrontWindow()) SelectWindow(w); else { Point pt = ev.where; GlobalToLocal(&pt); UI_ContentClick(pt); } break;
             case inSysWindow: SystemClick(&ev, w); break;
           }
         } break;
@@ -87,7 +107,7 @@ int main(void){
         case updateEvt: {
           WindowPtr uw = (WindowPtr)ev.message;
           SetPort(uw); BeginUpdate(uw);
-          /* transcript drawing added in 5.4 */
+          UI_Update();
           EndUpdate(uw);
         } break;
       }
