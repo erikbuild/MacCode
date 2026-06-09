@@ -118,3 +118,9 @@ See the toolchain and emulator guides in [`docs/`](docs/): [RETRO68_SETUP.md](do
 ## Smoke test
 
 connect → prompt → streamed reply (✻ verb, ● tool lines) → Allow a tool, Deny another → `esc` to interrupt → scroll back → File ▸ New / Resume → `!ls` → View ▸ Dark Mode → kill the proxy mid-session and reconnect via Session ▸ Connect → no crashes.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
