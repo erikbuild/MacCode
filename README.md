@@ -1,5 +1,10 @@
 # MacCode — Claude Code for the Macintosh SE
 
+![version](https://img.shields.io/badge/version-1.0.0-blue)
+[![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+![platform](https://img.shields.io/badge/platform-System_7_(68K)-lightgrey)
+![built with](https://img.shields.io/badge/built_with-Retro68-orange)
+
 MacCode is a native System 7 application for a 68K Macintosh (e.g. a Mac SE) that re-creates the Claude Code terminal UI on classic hardware and relays a Claude Agent SDK session running on a modern Mac. Three layers:
 
 - the **SE app** — C/Retro68 + the classic Toolbox + MacTCP

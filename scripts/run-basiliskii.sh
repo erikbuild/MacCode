@@ -42,7 +42,7 @@ EOF
 if [ -n "$1" ]; then
     BIN="$BUILD_DIR/$1.bin"
 else
-    BIN="$(ls -t "$BUILD_DIR"/*.bin 2>/dev/null | grep -v "\.code\.bin$" | head -1)"
+    BIN="$(ls -t "$BUILD_DIR"/*.bin 2>/dev/null | grep -vE '\.(code|rsrc)\.bin$|-v[0-9][^/]*\.bin$' | head -1)"
 fi
 
 if [ ! -f "$BIN" ]; then

@@ -70,8 +70,12 @@ resource 'SIZE' (-1) {
 /* ---- App icon + Finder bundle (raw data; Retro68's Rez has no ICN#/BNDL templates) ----
    Generated from assets/icon.gif (the Claude sparkle) — 1-bit silhouette, icon == mask. */
 
-data 'MCde' (0) {                         /* signature resource: "MacCode 1.0" pstring */
-    $"0B4D6163436F646520312E30"
+data 'MCde' (0) {                         /* signature resource: "MacCode 1.0.0" pstring */
+    $"0D4D6163436F646520312E302E30"
+};
+
+data 'vers' (1) {                         /* Finder "Get Info": Version 1.0.0 / "MacCode 1.0.0" */
+    $"01008000000005312E302E300D4D6163436F646520312E302E30"
 };
 
 data 'FREF' (128) {                       /* 'APPL', icon local id 0, empty name */
