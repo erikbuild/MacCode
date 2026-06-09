@@ -22,12 +22,22 @@ const project = path.resolve(arg("project", process.cwd())!);
 const model = arg("model");
 const echo = process.argv.includes("--echo");
 
+const onListenError = (err: NodeJS.ErrnoException) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`maccode-relay: port ${port} is already in use — is the proxy already running? (override with --port)`);
+  } else {
+    console.error(`maccode-relay: failed to start — ${err.message}`);
+  }
+  process.exit(1);
+};
+
 if (echo) {
   // SE bring-up target: echo every received frame back unchanged.
   const srv = net.createServer((sock) => {
     const dec = new FrameDecoder();
     sock.on("data", (c) => { for (const f of dec.push(c)) sock.write(encodeFrame(f.type, f.payload)); });
   });
+  srv.on("error", onListenError);
   srv.listen(port, host, () => console.log(`maccode-relay ECHO on ${host}:${port}`));
 } else {
   const srv = createServer({
@@ -35,5 +45,6 @@ if (echo) {
     makeSession: (onEvent, askPermission) => new Session({ cwd: project, model, onEvent, askPermission }),
     project,
   });
+  srv.on("error", onListenError);
   srv.listen(port, host, () => console.log(`maccode-relay on ${host}:${port} · project ${project}`));
 }
