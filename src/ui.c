@@ -28,6 +28,7 @@ static ControlActionUPP gScrollUPP = NULL;
 static TEHandle       gTE = NULL;
 static Boolean        gInputEnabled = true;
 static short          gSparklePhase = 0;
+static Boolean        gDark = false;
 
 static Rect ContentRect(void) {
     Rect r = gApp.win->portRect;
@@ -113,9 +114,17 @@ void UI_Init(void) {
     UI_InitInput();
 }
 
+/* Sets fore/back so EraseRect paints the background and text/lines paint legibly.
+   On the 1-bit SE under Color QuickDraw, white/black map to the two pixel values. */
+static void ApplyColors(void) {
+    if (gDark) { BackColor(blackColor); ForeColor(whiteColor); }
+    else       { BackColor(whiteColor); ForeColor(blackColor); }
+}
+
 void UI_DrawTranscript(void) {
     Rect cr = ContentRect();
     short i, y;
+    ApplyColors();
     TextFont(gFontNum); TextSize(9);
     EraseRect(&cr);
     for (i = 0; i < gVisRows; i++) {
@@ -135,7 +144,10 @@ void UI_DrawTranscript(void) {
 }
 
 void UI_Update(void) {
+    Rect full = gApp.win->portRect;
     RecomputeMetrics();
+    ApplyColors();
+    EraseRect(&full);          /* paint the whole content (incl. gutter) in the bg color */
     DrawControls(gApp.win);
     UI_DrawTranscript();
     UI_DrawInputAndVerb();
@@ -204,6 +216,7 @@ static void DrawSparkle(short cx, short cy) {
 void UI_DrawInputAndVerb(void) {
     Rect v   = VerbRect();
     Rect box = InputBox();
+    ApplyColors();
     /* separator line above the bottom strip */
     MoveTo(0, v.top - 1);
     LineTo(gApp.win->portRect.right, v.top - 1);
@@ -270,6 +283,12 @@ void UI_SetInputEnabled(Boolean on) {
         else    TEDeactivate(gTE);
     }
 }
+
+void UI_ToggleDark(void) {
+    gDark = !gDark;
+    InvalRect(&gApp.win->portRect);   /* force a full redraw in the new colors */
+}
+Boolean UI_IsDark(void) { return gDark; }
 
 void UI_Idle(void) {
     if (gTE && gInputEnabled) TEIdle(gTE);

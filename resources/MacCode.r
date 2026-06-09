@@ -7,7 +7,7 @@ resource 'WIND' (128, "MacCode") {
     {40, 2, 340, 510}, documentProc, visible, goAway, 0x0, "MacCode", noAutoCenter
 };
 
-resource 'MBAR' (128) { { 128, 129, 130, 131 } };
+resource 'MBAR' (128) { { 128, 129, 130, 131, 132 } };
 
 resource 'MENU' (128) {
     128, textMenuProc, allEnabled, enabled, apple,
@@ -31,6 +31,10 @@ resource 'MENU' (131, "Session") {
     131, textMenuProc, allEnabled, enabled, "Session",
     { "Connect...", noIcon, noKey, noMark, plain;
       "Disconnect", noIcon, noKey, noMark, plain }
+};
+resource 'MENU' (132, "View") {
+    132, textMenuProc, allEnabled, enabled, "View",
+    { "Dark Mode", noIcon, noKey, noMark, plain }
 };
 
 resource 'ALRT' (128) {

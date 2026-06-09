@@ -20,6 +20,8 @@
 #define kFileMenuID    129
 #define kEditMenuID    130
 #define kSessionMenuID 131
+#define kViewMenuID    132
+#define kDarkItem      1
 #define kWindowID      128
 #define kAlertID       128
 #define kAboutItem     1
@@ -151,6 +153,8 @@ static void HandleMenu(long mc){
   } else if (id == kSessionMenuID){
     if (item == kConnectItem) StartConnect();
     else if (item == kDisconnectItem) DoDisconnect();
+  } else if (id == kViewMenuID){
+    if (item == kDarkItem){ UI_ToggleDark(); CheckItem(GetMenuHandle(kViewMenuID), kDarkItem, UI_IsDark()); }
   }
   HiliteMenu(0);
 }
