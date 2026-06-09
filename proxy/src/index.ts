@@ -33,6 +33,7 @@ if (echo) {
   const srv = createServer({
     cwdLabel: project.replace(process.env.HOME ?? "", "~"),
     makeSession: (onEvent, askPermission) => new Session({ cwd: project, model, onEvent, askPermission }),
+    project,
   });
   srv.listen(port, host, () => console.log(`maccode-relay on ${host}:${port} · project ${project}`));
 }

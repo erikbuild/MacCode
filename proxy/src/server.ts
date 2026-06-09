@@ -7,6 +7,7 @@ import { verbForTurn } from "./verbs";
 import type { RelayEvent } from "./events";
 import type { PermissionAsk, PermissionFn } from "./session";
 import { log } from "./log";
+import { runShell } from "./shellrun";
 
 export interface SessionLike {
   start(mode: "new" | "resume"): void;
@@ -18,6 +19,7 @@ export interface SessionLike {
 export interface ServerDeps {
   makeSession: (onEvent: (ev: RelayEvent) => void, askPermission: PermissionFn) => SessionLike;
   cwdLabel: string;
+  project?: string;
 }
 
 export function createServer(deps: ServerDeps): net.Server {
@@ -83,6 +85,11 @@ export function createServer(deps: ServerDeps): net.Server {
             break;
           case "prompt":
             log(`<- prompt ${JSON.stringify(a.text.slice(0, 80))}`);
+            if (a.text.startsWith("!")) {
+              send(verbFrame("Running"));
+              runShell(a.text.slice(1).trim(), deps.project ?? process.cwd(), onEvent);
+              break;
+            }
             send(verbFrame(verbForTurn(turn++)));
             session.prompt(a.text);
             break;
