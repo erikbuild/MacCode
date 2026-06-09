@@ -93,8 +93,10 @@ int NetConnectPoll(NetGiveTime giveTime) {
 void NetConnectCancel(NetGiveTime giveTime) {
     if (!gConnecting) return;
     if (gOpenPB) {
-        LowKillTCP(gOpenPB);                        /* abort the pending open */
-        while (gOpenPB->ioResult > 0) (*giveTime)();/* completes ~immediately after the kill */
+        LowKillTCP(gOpenPB);                        /* try to kill the pending open call... */
+        if (gStream)                                /* ...and abort the stream so MacTCP completes the */
+            AbortConnection(gStream, (GiveTimePtr)giveTime, &gCancel);  /* open PB promptly even if PBKillIO is ignored for ActiveOpen */
+        while (gOpenPB->ioResult > 0) (*giveTime)();/* now settles quickly; we only free after it does */
         DisposePtr((Ptr)gOpenPB);
         gOpenPB = NULL;
     }
