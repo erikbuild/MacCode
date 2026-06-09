@@ -1,6 +1,6 @@
 # MacCode — Claude Code for the Macintosh SE
 
-![version](https://img.shields.io/badge/version-1.0.0-blue)
+![version](https://img.shields.io/badge/version-1.1.0-blue)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 ![platform](https://img.shields.io/badge/platform-System_7_(68K)-lightgrey)
 ![built with](https://img.shields.io/badge/built_with-Retro68-orange)
