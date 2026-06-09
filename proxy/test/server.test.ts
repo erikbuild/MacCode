@@ -188,8 +188,11 @@ describe("server", () => {
     // The streamed output (INFO + TEXT payloads) carries the echoed token.
     const out = frames.filter(f => f.type === RT.INFO || f.type === RT.TEXT).map(f => f.payload.toString()).join("");
     expect(out).toContain("maccode123");
-    // The stream ends with a DONE.
-    expect(frames[frames.length - 1].type).toBe(RT.DONE);
+    // The stream ends with a DONE, followed only by the empty verb-clear.
+    const doneIdx = frames.findIndex(f => f.type === RT.DONE);
+    expect(doneIdx).toBeGreaterThanOrEqual(0);
+    const after = frames.slice(doneIdx + 1);
+    expect(after.every(f => f.type === RT.VERB && f.payload.length === 0)).toBe(true);
     sock.end();
   }, 2000);
 
