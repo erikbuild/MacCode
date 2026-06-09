@@ -5,6 +5,7 @@
 #include <Windows.h>
 #include <TextEdit.h>
 #include <Dialogs.h>
+#include <Events.h>
 #include <Multiverse.h>
 #include <string.h>
 #include "app.h"
@@ -26,6 +27,7 @@ static short          gVisRows = 1;
 static ControlActionUPP gScrollUPP = NULL;
 static TEHandle       gTE = NULL;
 static Boolean        gInputEnabled = true;
+static short          gSparklePhase = 0;
 
 static Rect ContentRect(void) {
     Rect r = gApp.win->portRect;
@@ -190,12 +192,13 @@ void UI_InitInput(void) {
     gInputEnabled = true;
 }
 
-/* draws a small ✻ asterism glyph as crossed lines */
+/* draws a small ✻ sparkle as four crossed strokes; the phase omits one stroke for a twinkle */
 static void DrawSparkle(short cx, short cy) {
-    MoveTo(cx,    cy-3); LineTo(cx,    cy+3);
-    MoveTo(cx-3,  cy);   LineTo(cx+3,  cy);
-    MoveTo(cx-2,  cy-2); LineTo(cx+2,  cy+2);
-    MoveTo(cx-2,  cy+2); LineTo(cx+2,  cy-2);
+    short p = gSparklePhase & 3;
+    if (p != 0) { MoveTo(cx,   cy-3); LineTo(cx,   cy+3); }   /* | */
+    if (p != 1) { MoveTo(cx-3, cy);   LineTo(cx+3, cy);   }   /* - */
+    if (p != 2) { MoveTo(cx-2, cy-2); LineTo(cx+2, cy+2); }   /* \ */
+    if (p != 3) { MoveTo(cx-2, cy+2); LineTo(cx+2, cy-2); }   /* / */
 }
 
 void UI_DrawInputAndVerb(void) {
@@ -270,6 +273,14 @@ void UI_SetInputEnabled(Boolean on) {
 
 void UI_Idle(void) {
     if (gTE && gInputEnabled) TEIdle(gTE);
+    if (gApp.verb[0] && (gApp.state == ST_AWAITING_RESPONSE || gApp.state == ST_CONNECTING)) {
+        static unsigned long nextTick = 0;
+        if ((long)(TickCount() - nextTick) >= 0) {
+            nextTick = TickCount() + 15;     /* 15 ticks ≈ 0.25s → ~4 fps */
+            gSparklePhase++;
+            { Rect v = VerbRect(); InvalRect(&v); }
+        }
+    }
 }
 
 Boolean UI_ShowPermission(const char *desc, short len) {
