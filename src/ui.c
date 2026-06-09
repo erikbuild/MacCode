@@ -147,13 +147,20 @@ void UI_ScrollToBottom(void) {
 }
 
 void UI_TranscriptChanged(void) {
-    short mx;
+    short oldMax, newMax;
     Rect cr = ContentRect();
+    Boolean atBottom;
+    ScrollMax(&oldMax);
+    atBottom = (gApp.scrollTop >= oldMax);   /* were we pinned to the latest line? */
     RecomputeMetrics();
-    ScrollMax(&mx);
-    if (gVScroll) SetControlMaximum(gVScroll, mx);
-    UI_ScrollToBottom();
-    InvalRect(&cr);   /* request redraw */
+    ScrollMax(&newMax);
+    if (gVScroll) SetControlMaximum(gVScroll, newMax);
+    if (atBottom) UI_ScrollToBottom();        /* follow the tail only if we were already there */
+    else if (gApp.scrollTop > newMax) {       /* keep position, but clamp if the max shrank */
+        gApp.scrollTop = newMax;
+        if (gVScroll) SetControlValue(gVScroll, newMax);
+    }
+    InvalRect(&cr);
 }
 
 void UI_ContentClick(Point local) {
