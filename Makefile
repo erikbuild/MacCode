@@ -2,7 +2,7 @@
 # Actual building is delegated (CMake/Retro68 toolchain in build/,
 # emulator launches in scripts/run-*.sh). Run `make help` for targets.
 
-.PHONY: help setup fetch-deps build-retro68 doctor build basiliskii minivmac clean
+.PHONY: help setup fetch-deps build-retro68 doctor build basiliskii minivmac proxy clean
 
 help:
 	@echo "VibeRetro68 targets:"
@@ -13,6 +13,7 @@ help:
 	@echo "  make build          cmake --build build/  (compile the project)"
 	@echo "  make basiliskii     Build and run in Basilisk II"
 	@echo "  make minivmac       Build and (re)launch Mini vMac"
+	@echo "  make proxy          Run the MacCode relay proxy (project=cwd, port 4242)"
 	@echo "  make clean          Remove build/"
 
 setup:
@@ -35,6 +36,9 @@ basiliskii:
 
 minivmac:
 	@./scripts/run-minivmac.sh
+
+proxy:
+	@./scripts/run-proxy.sh $(ARGS)
 
 clean:
 	@rm -rf build/

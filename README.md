@@ -38,21 +38,28 @@ scripts/run-basiliskii.sh MacCode
 
 ## Run the proxy
 
-**Start the proxy before launching the app.**
+**Start the proxy before launching the app.** From the directory you want Claude to work in:
 
 ```bash
-npm --prefix proxy start -- --project <project-dir> --port 4242
+make proxy                 # or: scripts/run-proxy.sh
+```
+
+That serves the current directory as the project on port 4242 (and installs the proxy's
+dependencies on first run). Flags pass through to override the defaults:
+
+```bash
+scripts/run-proxy.sh --project ~/some/project --port 4242
 ```
 
 | Flag | Default | Purpose |
 |------|---------|---------|
-| `--project` | current working directory | Working dir for the Claude session **and** for `!` shell commands. |
+| `--project` | directory you run it from | Working dir for the Claude session **and** for `!` shell commands. |
 | `--port` | `4242` | TCP port to listen on. |
 | `--host` | `0.0.0.0` | Bind address; the default lets the emulator reach the host. |
 | `--model` | — | Optional model override. |
 | `--echo` | off | A bring-up echo server. Not for normal use. |
 
-The proxy logs timestamped lines to stderr (client connect, `<- prompt`, `-> text`, `shell:`, …). Run it via `npm --prefix proxy` so `tsx` resolves.
+The proxy logs timestamped lines to stderr (client connect, `<- prompt`, `-> text`, `shell:`, …).
 
 ---
 
