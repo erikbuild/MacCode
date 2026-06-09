@@ -35,6 +35,22 @@ static MunitResult dec_two(const MunitParameter p[], void *f) {
   munit_assert_uint8(fr.type, ==, 0x13);
   return MUNIT_OK;
 }
+static MunitResult dec_two_payloads(const MunitParameter p[], void *f) {
+  (void)p;(void)f;
+  WireDecoder d; WireDecoderInit(&d); WireFrame f1, f2;
+  /* Two frames packed into ONE push: TEXT "AAA" then TEXT "BBBBBB". The first frame's
+     payload must stay valid after the push even though the second is buffered behind it
+     (regression for the early-shift bug that clobbered f1.payload with the next frame). */
+  unsigned char buf[] = {0x01,0x00,0x03,'A','A','A',  0x01,0x00,0x06,'B','B','B','B','B','B'};
+  munit_assert_int(WireDecoderPush(&d, buf, (unsigned short)sizeof(buf), &f1), ==, 1);
+  munit_assert_int(f1.len, ==, 3);
+  munit_assert_memory_equal(3, f1.payload, "AAA");        /* was "BBB" with the bug */
+  munit_assert_int(WireDecoderPush(&d, NULL, 0, &f2), ==, 1);
+  munit_assert_int(f2.len, ==, 6);
+  munit_assert_memory_equal(6, f2.payload, "BBBBBB");
+  munit_assert_int(WireDecoderPush(&d, NULL, 0, &f1), ==, 0);   /* fully drained */
+  return MUNIT_OK;
+}
 static MunitResult dec_payload_split(const MunitParameter p[], void *f) {
   (void)p;(void)f;
   WireDecoder d; WireDecoderInit(&d); WireFrame fr;
@@ -96,6 +112,7 @@ static MunitTest tests[] = {
   {"/encode", enc, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/decode-split", dec_split, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/decode-two", dec_two, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {"/decode-two-payloads", dec_two_payloads, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/decode-payload-split", dec_payload_split, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/decode-too-big", dec_too_big, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/decode-over-room", dec_over_room, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

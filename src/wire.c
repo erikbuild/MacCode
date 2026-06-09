@@ -12,9 +12,17 @@ long WireEncode(unsigned char type, const unsigned char *payload, unsigned short
   return 3L + len;
 }
 
-void WireDecoderInit(WireDecoder *d) { d->used = 0; }
+void WireDecoderInit(WireDecoder *d) { d->used = 0; d->pending = 0; }
 
 int WireDecoderPush(WireDecoder *d, const unsigned char *data, unsigned short len, WireFrame *out) {
+  /* Consume the previously-returned frame now. The shift is deferred to here — rather than
+     done in the push that returned the frame — so out->payload (which points into d->buf)
+     stays valid until this next call, as the header contract promises. */
+  if (d->pending > 0) {
+    memmove(d->buf, d->buf + d->pending, (size_t)(d->used - d->pending));
+    d->used = (unsigned short)(d->used - d->pending);
+    d->pending = 0;
+  }
   if (len && data) {
     unsigned short room = (unsigned short)(sizeof(d->buf) - d->used);
     if (len > room) return -1;   /* would overflow the buffer; refuse rather than silently drop (caller must drop the connection) */
@@ -30,8 +38,7 @@ int WireDecoderPush(WireDecoder *d, const unsigned char *data, unsigned short le
     out->type = d->buf[0];
     out->payload = d->buf + 3;
     out->len = plen;
-    memmove(d->buf, d->buf + total, (size_t)(d->used - total));
-    d->used = (unsigned short)(d->used - total);
+    d->pending = (unsigned short)total;             /* defer the shift to the next push */
     return 1;
   }
 }

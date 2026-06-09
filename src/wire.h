@@ -29,6 +29,7 @@ long WireEncode(unsigned char type, const unsigned char *payload, unsigned short
 typedef struct {
   unsigned char buf[WIRE_BUF_SIZE];
   unsigned short used;
+  unsigned short pending;   /* bytes of a returned-but-not-yet-consumed frame (deferred shift) */
 } WireDecoder;
 
 typedef struct { unsigned char type; const unsigned char *payload; unsigned short len; } WireFrame;
