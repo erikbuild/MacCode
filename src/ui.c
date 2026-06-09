@@ -15,7 +15,8 @@
 #define INPUT_H        40   /* bottom strip reserved for input + verb (filled in 5.5) */
 #define LMARGIN         3
 #define kPermAlertID   129
-#define kPermAllowItem  1
+#define kPermDenyItem  1
+#define kPermAllowItem 2
 
 static ControlHandle  gVScroll = NULL;
 static short          gFontNum;     /* Monaco */

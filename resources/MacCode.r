@@ -49,8 +49,8 @@ resource 'ALRT' (129) {
     alertPositionMainScreen
 };
 resource 'DITL' (129) {
-    { {120, 312, 140, 382}, Button { enabled, "Allow" };
-      {120, 222, 140, 302}, Button { enabled, "Deny" };
+    { {120, 312, 140, 382}, Button { enabled, "Deny" };
+      {120, 222, 140, 302}, Button { enabled, "Allow" };
       {10, 70, 110, 382}, StaticText { disabled, "^0" } }
 };
 
