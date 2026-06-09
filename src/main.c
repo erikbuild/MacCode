@@ -145,8 +145,8 @@ static void HandleMenu(long mc){
     if (item == kAboutItem) ShowMsg("MacCode \xC9 Claude Code for the Macintosh SE");
     else { Str255 nm; GetMenuItemText(GetMenuHandle(kAppleMenuID), item, nm); OpenDeskAcc(nm); }
   } else if (id == kFileMenuID){
-    if (item == kNewItem)         { if (NetIsConnected()) ProtoSendNew(); }
-    else if (item == kResumeItem) { if (NetIsConnected()) ProtoSendResume(); }
+    if (item == kNewItem)         { if (NetIsConnected() && gApp.state == ST_IDLE) ProtoSendNew(); }
+    else if (item == kResumeItem) { if (NetIsConnected() && gApp.state == ST_IDLE) ProtoSendResume(); }
     else if (item == kQuitItem)   gApp.quitting = true;
   } else if (id == kSessionMenuID){
     if (item == kConnectItem) StartConnect();
