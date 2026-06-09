@@ -188,8 +188,9 @@ int main(void){
         case keyDown: case autoKey: {
           char c = (char)(ev.message & charCodeMask);
           if (ev.modifiers & cmdKey){ long mc = MenuKey(c); if (HiWord(mc)) HandleMenu(mc); }
-          else if (c == 0x1B){                   /* esc — interrupt the current turn */
+          else if (c == 0x1B){                   /* esc */
             if (gApp.state == ST_AWAITING_RESPONSE){ ProtoSendStop(); UI_SetVerb("Stopping"); }
+            else if (gApp.state == ST_CONNECTING){ DoDisconnect(); }
           }
           else {
             if (UI_InputKey(&ev)){               /* unmodified Return in the input box */
