@@ -173,4 +173,38 @@ describe("server", () => {
     expect(b.frames.some(f => f.type === RT.ERR)).toBe(false);
     b.sock.end();
   });
+
+  it("a bang command streams the shell output and a DONE", async () => {
+    const fake = new FakeSession(); const port = await startServer(fake);
+    const { sock, frames } = connect(port); await wait();
+    sock.write(HELLO);
+    sock.write(frame(RT.PROMPT, Buffer.from("!echo maccode123")));
+    // Wait until a DONE arrives (echo is fast), bounded by a short timeout.
+    for (let i = 0; i < 20 && !frames.some(f => f.type === RT.DONE); i++) await wait(25);
+    // The bang path never touches the session.
+    expect(fake.prompts).toEqual([]);
+    // The command echo is an INFO frame "$ echo maccode123".
+    expect(frames.some(f => f.type === RT.INFO && f.payload.toString() === "$ echo maccode123")).toBe(true);
+    // The streamed output (INFO + TEXT payloads) carries the echoed token.
+    const out = frames.filter(f => f.type === RT.INFO || f.type === RT.TEXT).map(f => f.payload.toString()).join("");
+    expect(out).toContain("maccode123");
+    // The stream ends with a DONE.
+    expect(frames[frames.length - 1].type).toBe(RT.DONE);
+    sock.end();
+  }, 2000);
+
+  it("STOP kills a running bang-command child and delivers DONE well under 2s", async () => {
+    const fake = new FakeSession(); const port = await startServer(fake);
+    const { sock, frames } = connect(port); await wait();
+    sock.write(HELLO); await wait();
+    // Start a 2-second sleep via a bang command
+    sock.write(frame(RT.PROMPT, Buffer.from("!sleep 2")));
+    await wait(100); // let the child start
+    // Kill it with STOP
+    sock.write(frame(RT.STOP));
+    // Wait up to 500ms — far less than the 2s the sleep would have taken
+    await wait(500);
+    expect(frames.some(f => f.type === RT.DONE)).toBe(true);
+    sock.end();
+  }, 3000);
 });

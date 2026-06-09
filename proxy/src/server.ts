@@ -39,6 +39,7 @@ export function createServer(deps: ServerDeps): net.Server {
     const dec = new FrameDecoder();
     let turn = 0;
     let askId = 1;
+    let activeShell: { kill: () => void } | null = null;
     const pending = new Map<number, (allow: boolean) => void>();
 
     const send = (buf: Buffer) => { if (!sock.destroyed) sock.write(buf); };
@@ -87,7 +88,10 @@ export function createServer(deps: ServerDeps): net.Server {
             log(`<- prompt ${JSON.stringify(a.text.slice(0, 80))}`);
             if (a.text.startsWith("!")) {
               send(verbFrame("Running"));
-              runShell(a.text.slice(1).trim(), deps.project ?? process.cwd(), onEvent);
+              activeShell = runShell(a.text.slice(1).trim(), deps.project ?? process.cwd(), (ev) => {
+                if (ev.kind === "done") activeShell = null;
+                onEvent(ev);
+              });
               break;
             }
             send(verbFrame(verbForTurn(turn++)));
@@ -101,7 +105,8 @@ export function createServer(deps: ServerDeps): net.Server {
           }
           case "stop":
             log("<- stop");
-            void session.interrupt();
+            if (activeShell) { activeShell.kill(); activeShell = null; }
+            else void session.interrupt();
             break;
           case "new":
             log("<- new");
@@ -124,6 +129,7 @@ export function createServer(deps: ServerDeps): net.Server {
     const cleanup = () => {
       if (cleanedUp) return;
       cleanedUp = true;
+      if (activeShell) { activeShell.kill(); activeShell = null; }
       session.stop();
       for (const [, r] of pending) r(false);
       pending.clear();

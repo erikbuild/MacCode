@@ -18,6 +18,11 @@ describe("toMacRoman", () => {
   it("degrades an astral (surrogate-pair) char to a single '?' byte with no stray bytes", () => {
     expect([...toMacRoman("a😀b")]).toEqual([0x61, 0x3f, 0x62]);
   });
+  it("maps un-encodable characters to '?' (0x3F), never NUL or dropped", () => {
+    const out = toMacRoman("a🎉b中c");
+    expect(out).not.toContain(0x00);          // no NUL (would truncate the SE C string)
+    expect(out.toString("latin1")).toBe("a?b?c");  // each un-mappable char -> '?'
+  });
 });
 
 describe("fromMacRoman", () => {
