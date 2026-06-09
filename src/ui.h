@@ -26,4 +26,7 @@ Boolean UI_IsDark(void);
 /* Modal tool-permission prompt. desc = Mac Roman bytes (len). Returns true=Allow, false=Deny. */
 Boolean UI_ShowPermission(const char *desc, short len);
 
+/* Modal dialog to edit the proxy server IP and port; saves prefs on OK. */
+void UI_ShowSettings(void);
+
 #endif

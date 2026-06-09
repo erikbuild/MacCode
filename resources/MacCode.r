@@ -30,7 +30,9 @@ resource 'MENU' (130, "Edit") {
 resource 'MENU' (131, "Session") {
     131, textMenuProc, allEnabled, enabled, "Session",
     { "Connect...", noIcon, noKey, noMark, plain;
-      "Disconnect", noIcon, noKey, noMark, plain }
+      "Disconnect", noIcon, noKey, noMark, plain;
+      "-", noIcon, noKey, noMark, plain;
+      "Server...", noIcon, noKey, noMark, plain }
 };
 resource 'MENU' (132, "View") {
     132, textMenuProc, allEnabled, enabled, "View",
@@ -56,6 +58,19 @@ resource 'DITL' (129) {
     { {120, 312, 140, 382}, Button { enabled, "Deny" };
       {120, 222, 140, 302}, Button { enabled, "Allow" };
       {10, 70, 110, 382}, StaticText { disabled, "^0" } }
+};
+
+resource 'DLOG' (200, "Server") {
+    {80, 90, 226, 410}, dBoxProc, invisible, noGoAway, 0x0, 200, "Server", noAutoCenter
+};
+resource 'DITL' (200) {
+    { {112, 236, 132, 306}, Button { enabled, "OK" };
+      {112, 150, 132, 220}, Button { enabled, "Cancel" };
+      { 34, 96,  50, 300}, EditText { enabled, "" };
+      { 64, 96,  80, 180}, EditText { enabled, "" };
+      { 34, 16,  50, 92},  StaticText { disabled, "Server IP:" };
+      { 64, 16,  80, 92},  StaticText { disabled, "Port:" };
+      {  8, 16,  26, 300}, StaticText { disabled, "Proxy server address" } }
 };
 
 resource 'SIZE' (-1) {

@@ -7,10 +7,12 @@
 #include <Dialogs.h>
 #include <Events.h>
 #include <Multiverse.h>
+#include <stdio.h>
 #include <string.h>
 #include "app.h"
 #include "transcript.h"
 #include "ui.h"
+#include "prefs.h"
 
 #define SCROLLBAR_W    15
 #define INPUT_H        40   /* bottom strip reserved for input + verb (filled in 5.5) */
@@ -18,6 +20,11 @@
 #define kPermAlertID   129
 #define kPermDenyItem  1
 #define kPermAllowItem 2
+#define kSettingsDLOG  200
+#define kSetOKItem     1
+#define kSetCancelItem 2
+#define kSetIPItem     3
+#define kSetPortItem   4
 
 static ControlHandle  gVScroll = NULL;
 static short          gFontNum;     /* Monaco */
@@ -315,4 +322,62 @@ Boolean UI_ShowPermission(const char *desc, short len) {
     ParamText(p, "\p", "\p", "\p");
     hit = CautionAlert(kPermAlertID, NULL);
     return (Boolean)(hit == kPermAllowItem);
+}
+
+/* Str255 (Pascal) -> C string into out (max incl NUL). */
+static void PToC(ConstStr255Param p, char *out, short max) {
+    short n = p[0];
+    if (n > max - 1) n = max - 1;
+    BlockMoveData(p + 1, out, n);
+    out[n] = '\0';
+}
+/* C string -> Str255 (Pascal). */
+static void CToP(const char *c, Str255 p) {
+    short n = 0;
+    while (c[n] && n < 255) { p[n + 1] = (unsigned char)c[n]; n++; }
+    p[0] = (unsigned char)n;
+}
+/* true if s is a valid dotted-quad (four 0..255 octets). */
+static Boolean ValidIP(const char *s) {
+    unsigned long a, b, c, d; char extra;
+    if (sscanf(s, "%lu.%lu.%lu.%lu%c", &a, &b, &c, &d, &extra) != 4) return false;
+    return (a < 256 && b < 256 && c < 256 && d < 256);
+}
+
+void UI_ShowSettings(void) {
+    DialogPtr dlg;
+    short hit, itype;
+    Handle ih;
+    Rect ir;
+    Str255 s;
+    char ip[16];
+    long port;
+
+    dlg = GetNewDialog(kSettingsDLOG, NULL, (WindowPtr)-1L);
+    if (!dlg) return;
+
+    /* preload current values */
+    CToP(gApp.serverIP, s);
+    GetDialogItem(dlg, kSetIPItem, &itype, &ih, &ir);   SetDialogItemText(ih, s);
+    NumToString((long)gApp.serverPort, s);
+    GetDialogItem(dlg, kSetPortItem, &itype, &ih, &ir); SetDialogItemText(ih, s);
+    SelectDialogItemText(dlg, kSetIPItem, 0, 32767);
+    ShowWindow(dlg);
+
+    for (;;) {
+        ModalDialog(NULL, &hit);
+        if (hit == kSetCancelItem) break;
+        if (hit == kSetOKItem) {
+            GetDialogItem(dlg, kSetIPItem, &itype, &ih, &ir);   GetDialogItemText(ih, s); PToC(s, ip, sizeof ip);
+            GetDialogItem(dlg, kSetPortItem, &itype, &ih, &ir); GetDialogItemText(ih, s); StringToNum(s, &port);
+            if (ValidIP(ip) && port > 0 && port < 65536) {
+                short i = 0; while (ip[i] && i < 15) { gApp.serverIP[i] = ip[i]; i++; } gApp.serverIP[i] = '\0';
+                gApp.serverPort = (unsigned short)port;
+                PrefsSave();
+                break;
+            }
+            SysBeep(10);   /* invalid IP/port: stay in the dialog */
+        }
+    }
+    DisposeDialog(dlg);
 }

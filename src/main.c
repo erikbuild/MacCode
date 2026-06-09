@@ -32,6 +32,7 @@
 #define kQuitItem      4
 #define kConnectItem    1
 #define kDisconnectItem 2
+#define kServerItem     4
 #define kSleep          4L
 #define kConnectTimeoutTicks 600L   /* ~10s at 60 ticks/sec before giving up on a connect */
 
@@ -159,6 +160,7 @@ static void HandleMenu(long mc){
   } else if (id == kSessionMenuID){
     if (item == kConnectItem) StartConnect();
     else if (item == kDisconnectItem) DoDisconnect();
+    else if (item == kServerItem) UI_ShowSettings();
   } else if (id == kViewMenuID){
     if (item == kDarkItem){ UI_ToggleDark(); CheckItem(GetMenuHandle(kViewMenuID), kDarkItem, UI_IsDark()); }
   }
