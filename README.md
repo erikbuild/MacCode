@@ -1,145 +1,113 @@
-# VibeRetro68
+# MacCode — Claude Code for the Macintosh SE
 
-A reference guide and project template for building classic Macintosh (System 6 and 7, 68K) applications on modern Apple Silicon Macs using the Retro68 cross-compiler toolchain.
+MacCode is a native System 7 application for a 68K Macintosh (e.g. a Mac SE) that re-creates the Claude Code terminal UI on classic hardware and relays a Claude Agent SDK session running on a modern Mac. Three layers:
 
-## Using This for a New Project
+- the **SE app** — C/Retro68 + the classic Toolbox + MacTCP
+- a tiny typed-record **wire protocol** over plain TCP (no SSL — trusted LAN / the emulator's slirp link)
+- a **Node/TypeScript proxy** — the Claude Agent SDK
 
-This repo is a template. If you're starting your own project, download a zip instead of cloning so you get a clean slate without our git history:
+You type prompts on the SE; Claude's replies stream back into a scrolling Monaco transcript with an animated ✻ verb line and ● tool lines, tool use is gated by an Allow/Deny dialog, and `!` commands run a host shell.
 
-1. Click **Code → Download ZIP** on GitHub, or:
+> Built on the [VibeRetro68](docs/RETRO68_SETUP.md) template (Retro68 toolchain + Basilisk II). The toolchain/emulator setup guides live in [`docs/`](docs/).
 
-   ```bash
-   curl -L https://github.com/erikbuild/VibeRetro68/archive/refs/heads/main.zip -o VibeRetro68.zip
-   unzip VibeRetro68.zip
-   cd VibeRetro68-main
-   ```
+---
 
-2. Initialize your own repo:
+## Prerequisites
 
-   ```bash
-   git init
-   git add -A
-   git commit -m "Initial commit from VibeRetro68 template"
-   ```
+- **macOS host.** Run `make setup` once to populate `deps/` with the Retro68 cross-toolchain and a preconfigured Basilisk II (System 7.x) with MacTCP over slirp. `make setup` runs four idempotent steps — `brew bundle`, `make fetch-deps`, `make build-retro68` (~30–60 min, one-time), `make doctor` — see [docs/RETRO68_SETUP.md](docs/RETRO68_SETUP.md) and [docs/EMULATOR_SETUP.md](docs/EMULATOR_SETUP.md) for detail. `deps/` is gitignored; every clone builds its own.
+- **Node.js** for the proxy.
+- **An authenticated Claude environment** for the Agent SDK (the proxy uses your existing Claude credentials).
 
-## What's Here
+---
 
-```
-src/                    Your project source (C/C++) — create as needed
-resources/              Rez resource definitions (.r files) — create as needed
-Brewfile                Homebrew prerequisites (cmake, boost, flex, …)
-Makefile                Task runner — shortcuts for the scripts/ commands
-docs/
-  RETRO68_SETUP.md      Toolchain installation and configuration
-  EMULATOR_SETUP.md     Basilisk II and Mini vMac setup
-  WORKFLOW.md           Iterative dev workflow with Claude Code
-scripts/
-  setup.sh              One-shot: fetch-deps → build-retro68 → doctor
-  fetch-deps.sh         Download Retro68 source, emulators, ROMs into deps/
-  build-retro68.sh      Build the Retro68 cross-compiler (~30-60 min, one-time)
-  doctor.sh             Diagnose missing or misconfigured pieces of deps/
-  run-basiliskii.sh     Build, copy .bin to Basilisk II shared folder, launch the emulator
-  run-minivmac.sh       Build and (re)launch Mini vMac with the resulting .dsk
-deps/                   Retro68 toolchain + emulators (gitignored — see deps/*/README.md)
-```
-
-Put your source files under `src/`.
-
-## Quick Start
-
-### One-shot setup
+## Build the SE app
 
 ```bash
-make setup
+cmake --build build --target MacCode_APPL
 ```
 
-That runs the four sub-steps in order:
+**Important:** build the **`MacCode_APPL`** target, not the bare `MacCode`. `MacCode` only links the code; `MacCode_APPL` runs the Rez/packaging step that produces the runnable `build/MacCode.bin` / `.dsk` (and sets the Finder bundle bit for the app icon). If `MacCode.bin`'s timestamp doesn't update after a build, you built the wrong target.
 
-| Step | What it does |
-|------|--------------|
-| 1. `brew bundle` | Install the Homebrew formulae listed in [Brewfile](Brewfile) (cmake, boost, flex, etc.) |
-| 2. `make fetch-deps` | Clone Retro68, download emulator binaries, ROMs, and the System 7.5.3 disk image into `deps/` |
-| 3. `make build-retro68` | Build the Retro68 toolchain (~30-60 min, one-time) and configure the project's `build/` against it |
-| 4. `make doctor` | Verify every piece is in place; exits non-zero on any failure |
-
-Homebrew itself is required up front — `make setup` errors out with
-install instructions if `brew` isn't on `PATH`.
-
-Every target is idempotent, so `make setup` is safe to re-run after a
-partial install or a `git pull` that adds new deps. You can also invoke
-any sub-target directly if you only need that step.
-
-The `deps/` directory is gitignored — every clone builds its own
-toolchain. See [deps/retro68/README.md](deps/retro68/README.md) for layout.
-
-### Start a New Project
-
-Create a `CMakeLists.txt` at the project root:
-
-```cmake
-cmake_minimum_required(VERSION 3.9)
-project(MyApp C)
-
-add_application(MyApp
-    src/main.c
-    resources/MyApp.r
-)
-```
-
-No separate CMake-configure step needed — `make build-retro68`
-configures `build/` against the toolchain on its way out. If you ever
-delete `build/`, just re-run `make build-retro68` and it'll
-reconfigure (the toolchain build itself is already cached).
-
-### Edit → Build → Run
-
-Pick the emulator that fits the moment:
+Simpler — the run script builds everything, deploys `MacCode.bin` into Basilisk II's shared folder, and launches the emulator:
 
 ```bash
-make basiliskii    # System 7.5.3 / Quadra 950 — interactive testing
-make minivmac      # Mac SE FDHD — fast, minimal, drag-disk workflow
+scripts/run-basiliskii.sh MacCode
 ```
 
-Run `make` with no arguments to see every available target.
+---
 
-Each target does `cmake --build build/` first, then hands off to the emulator:
+## Run the proxy
 
-- **`make basiliskii`** drops the freshly-built `.bin` into
-  `deps/basiliskii/shared/` and launches Basilisk II if it isn't already
-  running. Basilisk II's shared folder is `extfs`-synced live, so a
-  running emulator picks up the new `.bin` automatically — no restart
-  needed when iterating.
-- **`make minivmac`** kills any running Mini vMac, then relaunches it
-  with the fresh `MyApp.dsk` (or whatever `.dsk` your build produced).
-  The kill-first ordering matters: Mini vMac mmaps the disk image, and
-  overwriting it under a live emulator corrupts the resource fork.
+**Start the proxy before launching the app.**
 
-To pick a specific app when you have multiple outputs, invoke the
-underlying script directly: `scripts/run-basiliskii.sh MyApp` or
-`scripts/run-minivmac.sh MyApp`.
+```bash
+npm --prefix proxy start -- --project <project-dir> --port 4242
+```
 
-### Testing on Real Hardware
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--project` | current working directory | Working dir for the Claude session **and** for `!` shell commands. |
+| `--port` | `4242` | TCP port to listen on. |
+| `--host` | `0.0.0.0` | Bind address; the default lets the emulator reach the host. |
+| `--model` | — | Optional model override. |
+| `--echo` | off | A bring-up echo server. Not for normal use. |
 
-Mount `build/` over AFP on the classic Mac to easily run the compiled application.
+The proxy logs timestamped lines to stderr (client connect, `<- prompt`, `-> text`, `shell:`, …). Run it via `npm --prefix proxy` so `tsx` resolves.
 
-The [TashTalk USB](https://www.tindie.com/products/feralfirmware/tashtalk-usb/) device and [GUI interface](https://github.com/FeralFirmware/TailTalk/releases) are recommended.
+---
 
-## Toolchain
+## Launch and connect
 
-All toolchain components live under `deps/retro68/` (gitignored — every clone builds its own).
+1. Start the proxy (above).
+2. `scripts/run-basiliskii.sh MacCode`, then open **MacCode** inside the emulated Mac.
 
-| Component | Location |
-|-----------|----------|
-| Retro68 source | `deps/retro68/Retro68/` |
-| Build output / toolchain | `deps/retro68/Retro68-build/toolchain/` |
-| CMake toolchain file | `deps/retro68/Retro68-build/toolchain/m68k-apple-macos/cmake/retro68.toolchain.cmake` |
-| Basilisk II | `deps/basiliskii/` |
-| Mini vMac | `deps/minivmac/minivmac-macOS-SEFDHD.app` |
+On launch it connects to `10.0.2.2:4242` (the slirp gateway = the host). If the proxy is down it reports "could not connect" but stays responsive (the connect is non-blocking). Use **Session ▸ Connect / Disconnect** to retry.
 
-## Documentation
+---
 
-See the `docs/` directory for detailed guides:
+## Using it
 
-- **[RETRO68_SETUP.md](docs/RETRO68_SETUP.md)** — Full toolchain reference: prerequisites, build flags, troubleshooting Apple Silicon issues, Universal vs Multiversal interfaces
-- **[EMULATOR_SETUP.md](docs/EMULATOR_SETUP.md)** — Basilisk II (interactive testing) and Mini vMac (automated testing) configuration
-- **[WORKFLOW.md](docs/WORKFLOW.md)** — The edit-build-test loop using Claude Code as a coding partner
+Type a prompt and press **Return**. The ✻ verb line animates while Claude works, ● tool lines show tool calls, and the reply streams into the transcript.
+
+- **Tool permissions.** Dangerous / not-pre-approved operations pop an **Allow / Deny** dialog — **Deny is the default** (Return denies) so an accidental keypress can't approve. Safe/allow-listed ops run without asking.
+- **`esc`.** Interrupts the current turn; also cancels an in-progress connect.
+- **File ▸ New Conversation / Resume Last.** Fresh conversation or resume the most recent one (when idle).
+- **`!` bang commands.** `!somecommand` runs a shell command directly on the **proxy host** (project dir), output streamed back — bypasses Claude, no permission dialog (you invoked it). Arbitrary shell exec, by design.
+- **View ▸ Dark Mode.** White-on-black, session-only.
+- **Scrollback.** Scroll up to read history; the view follows new output only when you're at the bottom.
+
+### Permissions model
+
+The proxy runs the Agent SDK with your host's settings, honoring the allow-rules in `~/.claude` and the project's `.claude/settings*.json`: safe/allow-listed operations auto-run; dangerous/unlisted ones prompt the Allow/Deny dialog on the SE.
+
+---
+
+## Known limits
+
+- Single client only (one SE at a time).
+- Text is **Mac Roman**; characters with no Mac Roman equivalent render as `?`.
+- The proxy should not stream very large output while a permission ask is outstanding (the SE pauses reading during the modal dialog).
+- Clipboard sharing is not yet implemented.
+
+---
+
+## Project layout
+
+```
+src/                 SE app (C): event loop, UI, wire codec, transcript, netmac, proto
+resources/MacCode.r  Rez resources: window, menus, dialogs, SIZE, app icon (ICN#/BNDL/…)
+proxy/               Node/TypeScript proxy (Claude Agent SDK) + vitest tests
+tests-native/        Host-side unit tests for the SE's pure-C logic (wire codec, transcript)
+tools/               Build helpers (e.g. set_bundle_bit.py)
+scripts/             setup / build / emulator-launch scripts
+docs/                Toolchain + emulator setup guides
+deps/                Retro68 toolchain + emulators (gitignored)
+```
+
+See the toolchain and emulator guides in [`docs/`](docs/): [RETRO68_SETUP.md](docs/RETRO68_SETUP.md), [EMULATOR_SETUP.md](docs/EMULATOR_SETUP.md), [WORKFLOW.md](docs/WORKFLOW.md).
+
+---
+
+## Smoke test
+
+connect → prompt → streamed reply (✻ verb, ● tool lines) → Allow a tool, Deny another → `esc` to interrupt → scroll back → File ▸ New / Resume → `!ls` → View ▸ Dark Mode → kill the proxy mid-session and reconnect via Session ▸ Connect → no crashes.
