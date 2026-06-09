@@ -24,6 +24,7 @@ static short          gFontNum;     /* Monaco */
 static short          gLineH = 12;
 static short          gCharW = 6;
 static short          gVisRows = 1;
+static Boolean        gFollowTail = true;   /* keep the view pinned to the latest line until the user scrolls up */
 static ControlActionUPP gScrollUPP = NULL;
 static TEHandle       gTE = NULL;
 static Boolean        gInputEnabled = true;
@@ -97,6 +98,7 @@ static pascal void ScrollAction(ControlHandle c, int16_t part) {
     if (v != GetControlValue(c)) {
         SetControlValue(c, v);
         gApp.scrollTop = v;
+        gFollowTail = (v >= mx);   /* resume following only when scrolled back to the bottom */
         UI_DrawTranscript();
     }
 }
@@ -157,22 +159,21 @@ void UI_ScrollToBottom(void) {
     short mx;
     ScrollMax(&mx);
     gApp.scrollTop = mx;
+    gFollowTail = true;
     if (gVScroll) SetControlValue(gVScroll, mx);
 }
 
 void UI_TranscriptChanged(void) {
-    short oldMax, newMax;
+    short mx;
     Rect cr = ContentRect();
-    Boolean atBottom;
-    ScrollMax(&oldMax);
-    atBottom = (gApp.scrollTop >= oldMax);   /* were we pinned to the latest line? */
     RecomputeMetrics();
-    ScrollMax(&newMax);
-    if (gVScroll) SetControlMaximum(gVScroll, newMax);
-    if (atBottom) UI_ScrollToBottom();        /* follow the tail only if we were already there */
-    else if (gApp.scrollTop > newMax) {       /* keep position, but clamp if the max shrank */
-        gApp.scrollTop = newMax;
-        if (gVScroll) SetControlValue(gVScroll, newMax);
+    ScrollMax(&mx);
+    if (gVScroll) SetControlMaximum(gVScroll, mx);
+    if (gFollowTail) {
+        UI_ScrollToBottom();                 /* pinned to the bottom: follow the new output */
+    } else if (gApp.scrollTop > mx) {        /* scrolled up: keep position, clamp if the max shrank */
+        gApp.scrollTop = mx;
+        if (gVScroll) SetControlValue(gVScroll, mx);
     }
     InvalRect(&cr);
 }
@@ -185,6 +186,7 @@ void UI_ContentClick(Point local) {
         if (part == inThumb) {
             TrackControl(ctl, local, NULL);
             gApp.scrollTop = GetControlValue(ctl);
+            gFollowTail = (gApp.scrollTop >= GetControlMaximum(gVScroll));
             UI_DrawTranscript();
         } else {
             TrackControl(ctl, local, gScrollUPP);
