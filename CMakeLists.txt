@@ -7,6 +7,7 @@ add_application(MacCode
     src/main.c
     src/netmac.c
     src/proto.c
+    src/prefs.c
     src/ui.c
     src/wire.c
     src/transcript.c

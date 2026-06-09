@@ -10,10 +10,12 @@
 #include <Memory.h>
 #include <Devices.h>
 #include <OSUtils.h>
+#include <stdio.h>
 #include "app.h"
 #include "ui.h"
 #include "proto.h"
 #include "netmac.h"
+#include "prefs.h"
 
 #define kMBARID        128
 #define kAppleMenuID   128
@@ -58,7 +60,7 @@ static void StartConnect(void){
   OSErr err;
   if (NetIsConnected() || gApp.state == ST_CONNECTING) return;
   WireDecoderInit(&gApp.dec);
-  err = NetConnectBegin("10.0.2.2", 4242, AppGiveTime);
+  err = NetConnectBegin(gApp.serverIP, gApp.serverPort, AppGiveTime);
   if (err != noErr){
     gApp.state = ST_ERROR;
     UI_SetVerb("");
@@ -87,8 +89,12 @@ static void PumpConnect(void){
   if (gApp.state != ST_CONNECTING) return;
   r = NetConnectPoll(AppGiveTime);
   if (r == 1){                                  /* still connecting */
-    if ((long)(TickCount() - gConnectDeadline) >= 0)
-      ConnectFailed("* could not reach the proxy (10.0.2.2:4242) \xD0 Session \xC9 Connect to retry");
+    if ((long)(TickCount() - gConnectDeadline) >= 0){
+      char msg[100];
+      sprintf(msg, "* could not reach the proxy (%s:%u) \xD0 Session \xC9 Connect to retry",
+              gApp.serverIP, (unsigned)gApp.serverPort);
+      ConnectFailed(msg);
+    }
     return;
   }
   if (r == 0){                                  /* connected */
@@ -170,10 +176,13 @@ int main(void){
   SetPort(gApp.win);
   gApp.state = ST_DISCONNECTED; gApp.quitting = false;
   gApp.verb[0] = '\0'; gApp.pendingAskId = 0; gApp.scrollTop = 0;
+  { const char *def = "10.0.2.2"; short i = 0; while (def[i] && i < 15){ gApp.serverIP[i] = def[i]; i++; } gApp.serverIP[i] = '\0'; }
+  gApp.serverPort = 4242;
   UI_Init();
   UI_SetInputEnabled(false);   /* enabled on successful connect */
   UI_Update();                 /* paint the empty window before the (possibly slow) connect */
   NetInit();                   /* open the MacTCP driver once before connecting */
+  PrefsLoad();                 /* override the default address from the prefs file, if present */
   StartConnect();
 
   while (!gApp.quitting){

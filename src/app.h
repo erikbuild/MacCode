@@ -19,6 +19,8 @@ typedef struct {
   char          verb[64];       /* current verb text ("" = none) */
   unsigned long pendingAskId;   /* ASK id awaiting PERM (0 = none) */
   short         scrollTop;      /* first visible transcript line */
+  char          serverIP[16];   /* dotted-quad proxy address, e.g. "10.0.2.2" */
+  unsigned short serverPort;    /* proxy TCP port, e.g. 4242 */
 } AppGlobals;
 
 extern AppGlobals gApp;
