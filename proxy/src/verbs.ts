@@ -5,6 +5,9 @@ export const VERBS = [
   "Tinkering", "Noodling", "Synthesizing", "Untangling", "Brewing",
 ];
 
-export function verbForTurn(turnIndex: number): string {
-  return VERBS[turnIndex % VERBS.length];
+// Pick a random verb. Pass the previous one to avoid showing the same word
+// twice in a row (which reads as the line not having changed).
+export function randomVerb(previous?: string): string {
+  const choices = previous ? VERBS.filter((v) => v !== previous) : VERBS;
+  return choices[Math.floor(Math.random() * choices.length)];
 }

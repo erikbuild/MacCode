@@ -1,13 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { VERBS, verbForTurn } from "../src/verbs";
+import { VERBS, randomVerb } from "../src/verbs";
 
-describe("verbForTurn", () => {
-  it("returns the verb at the turn index", () => {
-    expect(verbForTurn(0)).toBe(VERBS[0]);
-    expect(verbForTurn(3)).toBe(VERBS[3]);
+describe("randomVerb", () => {
+  it("returns a verb from the list", () => {
+    for (let i = 0; i < 50; i++) expect(VERBS).toContain(randomVerb());
   });
-  it("wraps around the list", () => {
-    expect(verbForTurn(VERBS.length)).toBe(VERBS[0]);
-    expect(verbForTurn(VERBS.length + 2)).toBe(VERBS[2]);
+  it("never repeats the previous verb back-to-back", () => {
+    for (let i = 0; i < 100; i++) {
+      const v = randomVerb(VERBS[0]);
+      expect(VERBS).toContain(v);
+      expect(v).not.toBe(VERBS[0]);
+    }
   });
 });

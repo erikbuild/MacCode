@@ -3,7 +3,7 @@
 import net from "node:net";
 import { FrameDecoder, PROTOCOL_VERSION } from "./protocol";
 import { eventToFrames, framesForEvent, verbFrame, clearVerbFrame, askFrame, infoFrame, parseClientFrame, type ClientAction } from "./translate";
-import { verbForTurn } from "./verbs";
+import { randomVerb } from "./verbs";
 import type { RelayEvent } from "./events";
 import type { PermissionAsk, PermissionFn } from "./session";
 import { log } from "./log";
@@ -37,7 +37,7 @@ export function createServer(deps: ServerDeps): net.Server {
     log(`client connected: ${who}`);
 
     const dec = new FrameDecoder();
-    let turn = 0;
+    let lastVerb: string | undefined;
     let askId = 1;
     let activeShell: { kill: () => void } | null = null;
     const pending = new Map<number, (allow: boolean) => void>();
@@ -94,7 +94,8 @@ export function createServer(deps: ServerDeps): net.Server {
               });
               break;
             }
-            send(verbFrame(verbForTurn(turn++)));
+            lastVerb = randomVerb(lastVerb);
+            send(verbFrame(lastVerb));
             session.prompt(a.text);
             break;
           case "perm": {
