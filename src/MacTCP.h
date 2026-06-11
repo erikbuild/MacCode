@@ -149,6 +149,12 @@ typedef struct TCPStatusPB {
     unsigned long   srtt;
     unsigned long   lastRtt;
     unsigned long   sendMaxSegSize;
+    Ptr             connStatPtr;        /* TCPConnectionStats* the driver writes back */
+    Ptr             userDataPtr;
+    /* connStatPtr/userDataPtr complete Apple's real TCPStatusPB. They are the
+       largest variant in the csParam union, so they size every TCPiopb the driver
+       fills: omit them and a TCPStatus call writes 8 bytes past NewPtr(sizeof(TCPiopb))
+       and corrupts the next heap block (System error 33, dsNegZcbFree). */
 } TCPStatusPB;
 
 typedef struct TCPGlobalInfoPB {
